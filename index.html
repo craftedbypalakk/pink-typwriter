@@ -3,18 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Typewriter</title>
+<title>Pink Typewriter</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:100%;height:100%;overflow:hidden;background:#111}
+html,body{width:100%;height:100%;overflow:hidden;background:#160610}
 canvas{display:block}
-#loader{position:fixed;inset:0;z-index:100;background:#111;
+#loader{position:fixed;inset:0;z-index:100;background:radial-gradient(ellipse at 50% 40%,#2e0a1c,#160610);
 display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
 transition:opacity .6s;font-family:monospace}
 #loader.hide{opacity:0;pointer-events:none}
-#lt{font-size:12px;letter-spacing:4px;color:#888}
-#lb{width:200px;height:2px;background:#333;border-radius:1px;overflow:hidden}
-#lp{height:100%;width:0;background:#aaa;transition:width .3s}
+#lt{font-size:12px;letter-spacing:4px;color:#e090b0}
+#lb{width:200px;height:2px;background:#3a1828;border-radius:1px;overflow:hidden}
+#lp{height:100%;width:0;background:linear-gradient(90deg,#c8507a,#ff9ec4);transition:width .3s}
+#ui{position:fixed;bottom:20px;right:20px;font-size:10px;letter-spacing:2px;
+color:rgba(255,160,200,.4);z-index:10;pointer-events:none;font-family:monospace}
 </style>
 </head>
 <body>
@@ -22,6 +24,7 @@ transition:opacity .6s;font-family:monospace}
 <div id="lt">LOADING</div>
 <div id="lb"><div id="lp"></div></div>
 </div>
+<div id="ui">DRAG &middot; SCROLL &middot; RIGHT-DRAG PAN</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -45,53 +48,84 @@ function init(){
   R.shadowMap.type=T.PCFSoftShadowMap;
   R.outputEncoding=T.sRGBEncoding;
   R.toneMapping=T.ACESFilmicToneMapping;
-  R.toneMappingExposure=1.1;
+  R.toneMappingExposure=1.15;
   document.body.appendChild(R.domElement);
 
   const scene=new T.Scene();
-  scene.background=new T.Color(0x1a1a1a);
+  scene.background=new T.Color(0x160610);
+  scene.fog=new T.FogExp2(0x160610,.02);
 
   const cam=new T.PerspectiveCamera(45,innerWidth/innerHeight,.01,1000);
-  cam.position.set(0,2,6);
+  cam.position.set(0.3,2.4,5.5);
 
   const ctrl=new T.OrbitControls(cam,R.domElement);
   ctrl.enableDamping=true;
   ctrl.dampingFactor=.08;
   ctrl.target.set(0,0,0);
+  ctrl.autoRotate=true;
+  ctrl.autoRotateSpeed=.8;
 
   window.addEventListener("resize",()=>{
     cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();
     R.setSize(innerWidth,innerHeight);
   });
+  R.domElement.addEventListener("pointerdown",()=>ctrl.autoRotate=false);
 
-  // Environment for reflections
+  // Pink studio environment for metallic reflections
   const pm=new T.PMREMGenerator(R);
   const es=new T.Scene();
   es.add(new T.Mesh(new T.SphereGeometry(50,16,8),
-    new T.MeshBasicMaterial({color:0x404040,side:T.BackSide})));
-  [[-8,6,4,0xffffff],[8,4,4,0xdddddd],[0,12,0,0xffffff]].forEach(a=>{
-    const m=new T.Mesh(new T.PlaneGeometry(10,8),new T.MeshBasicMaterial({color:a[3]}));
+    new T.MeshBasicMaterial({color:0x2a0818,side:T.BackSide})));
+  [[-8,6,4,0xffb0d8,10,8],[8,4,4,0xd0a0ff,8,7],[0,12,0,0xffe0ee,12,10],[0,3,-9,0xff4090,10,6]].forEach(a=>{
+    const m=new T.Mesh(new T.PlaneGeometry(a[4],a[5]),new T.MeshBasicMaterial({color:a[3]}));
     m.position.set(a[0],a[1],a[2]);m.lookAt(0,0,0);es.add(m);
   });
-  scene.environment=pm.fromScene(es,.04).texture;
+  const env=pm.fromScene(es,.04).texture;
+  scene.environment=env;
   pm.dispose();
 
   // Lights
-  scene.add(new T.AmbientLight(0xffffff,.6));
-  const k=new T.DirectionalLight(0xffffff,3);
+  scene.add(new T.AmbientLight(0xffc0dc,.5));
+  const k=new T.DirectionalLight(0xffd8ec,5);
   k.position.set(-5,10,7);k.castShadow=true;
-  k.shadow.mapSize.set(2048,2048);
+  k.shadow.mapSize.set(4096,4096);
   k.shadow.camera.left=-6;k.shadow.camera.right=6;
   k.shadow.camera.top=6;k.shadow.camera.bottom=-6;
-  k.shadow.bias=-.0003;scene.add(k);
-  const f=new T.DirectionalLight(0xffffff,1);
-  f.position.set(6,3,4);scene.add(f);
+  k.shadow.bias=-.0003;k.shadow.radius=5;scene.add(k);
+  const f=new T.DirectionalLight(0xc0a0ff,2);f.position.set(8,3,4);scene.add(f);
+  const rim=new T.DirectionalLight(0xff4090,2.5);rim.position.set(0,3,-8);scene.add(rim);
+  const top=new T.PointLight(0xffe8f4,3,30,2);top.position.set(0,12,0);scene.add(top);
 
   // Shadow floor
-  const sf=new T.Mesh(new T.PlaneGeometry(30,30),new T.ShadowMaterial({opacity:.3}));
+  const sf=new T.Mesh(new T.PlaneGeometry(30,30),new T.ShadowMaterial({opacity:.4}));
   sf.rotation.x=-Math.PI/2;sf.position.y=-1.4;sf.receiveShadow=true;scene.add(sf);
 
-  // Load GLB as-is (from same folder, NOT embedded)
+  // Pink metallic material map by original material name
+  const MM=(c,rg,mt,ei=1.5)=>new T.MeshStandardMaterial({
+    color:new T.Color(c),roughness:rg,metalness:mt,envMap:env,envMapIntensity:ei});
+  const MAP={
+    // Body -> pink metallic (glossy, high metalness)
+    "Royal_typewriter_Plastic":     MM(0xe85a90,.18,.85,2.0),
+    "Material_51":                  MM(0xdf5088,.18,.85,2.0),
+    "17_-_Default":                 MM(0xe05a8a,.18,.85,2.0),
+    // Chrome stays bright chrome
+    "Metal_Chrome":                 MM(0xf2ecf2,.05,1.0,3.0),
+    // Rubber/tape dark
+    "Royal_typewriter_Rubber":      MM(0x1c0a14,.8,.1,.2),
+    "Royal_typewriter_Tape":        MM(0x1a0610,.9,.0,.05),
+    // Keys ivory
+    "Royal_typewriter_Buttons":     MM(0xf6eee2,.25,.05,.8),
+    // Black metal -> dark rose metallic
+    "Royal_typewriter_Metal_black": MM(0x40122a,.35,.7,1.4),
+    // Measure -> rose gold
+    "Royal_typewriter_Measure":     MM(0xd47c9a,.3,.6,1.6),
+    // Paper blush
+    "Royal_typewriter_Paper":       MM(0xf6e6ee,.9,.0,.2),
+    // Label gold
+    "Royal_typewriter_Label":       MM(0xe0b060,.2,.9,2.5),
+  };
+
+  // Load GLB and apply pink metallic
   new T.GLTFLoader().load("typewriter.glb",g=>{
     setP(90);
     const m=g.scene;
@@ -102,7 +136,17 @@ function init(){
     m.scale.setScalar(sc);
     m.position.copy(c.multiplyScalar(-sc));
     m.position.y+=(-box.min.y*sc)-1.4;
-    m.traverse(ch=>{if(ch.isMesh){ch.castShadow=true;ch.receiveShadow=true;}});
+    m.traverse(ch=>{
+      if(!ch.isMesh)return;
+      ch.castShadow=true;ch.receiveShadow=true;
+      const arr=Array.isArray(ch.material)?ch.material:[ch.material];
+      ch.material=arr.map(orig=>{
+        const nm=(MAP[orig&&orig.name]||MM(0xe05a8a,.18,.85,2.0)).clone();
+        if(orig&&orig.normalMap){nm.normalMap=orig.normalMap;nm.normalScale.set(.6,.6);}
+        return nm;
+      });
+      if(ch.material.length===1)ch.material=ch.material[0];
+    });
     scene.add(m);
     setP(100);
     setTimeout(()=>document.getElementById("loader").classList.add("hide"),400);
