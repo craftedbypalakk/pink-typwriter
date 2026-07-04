@@ -176,35 +176,28 @@ const keyState = {}; // per key: {pressing, origPos, t}
 
 function pressKey(code){
   const obj = keyMeshMap[code];
-  if(!obj || keyState[code]?.pressing) return;
-  keyState[code] = { pressing: true };
-
-  // Store world position baseline
-  const wp = new T.Vector3();
-  obj.getWorldPosition(wp);
-  obj.userData.worldBase = wp.clone();
-
-  // Move key: in the model's local space, "pressing down" 
-  // is along +Z (because root is rotated -90° on X)
-  // We modify the node's local translation directly
-  if(obj.userData.origZ === undefined) obj.userData.origZ = obj.position.z;
-  obj.position.z = obj.userData.origZ + 0.6; // press down in local Z
+  if(!obj) return;
+  // Store original position lazily (after model is fully positioned)
+  if(obj.userData.origPos === undefined){
+    obj.userData.origPos = obj.position.clone();
+  }
+  // In model local space (before scaling), pressing a key moves ~0.5 units in Z
+  // The model root has -90° X rotation so local +Z = world -Y (downward)
+  // Use the parent's world matrix to determine correct local press direction
+  obj.position.z = obj.userData.origPos.z + 0.6;
 }
 
 function releaseKey(code){
   const obj = keyMeshMap[code];
-  if(!obj) return;
-  if(obj.userData.origZ === undefined) return;
-  keyState[code] = { pressing: false };
+  if(!obj || obj.userData.origPos===undefined) return;
 
   const startZ = obj.position.z;
-  const targetZ = obj.userData.origZ;
+  const targetZ = obj.userData.origPos.z;
   const t0s = performance.now();
   const dur = 130;
 
   function spring(now){
     const p = Math.min((now - t0s) / dur, 1);
-    // Elastic ease-out
     const ease = p >= 1 ? 1 :
       1 - Math.pow(2, -10*p) * Math.cos((p * 10 - 0.75) * (Math.PI*2/3));
     obj.position.z = startZ + (targetZ - startZ) * ease;
@@ -235,18 +228,27 @@ addEventListener("keyup",e=>{ releaseKey(e.code); });
 new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
   setP(90);
   const m=g.scene;
-  m.traverse(ch=>{if(ch.isMesh){ch.castShadow=ch.receiveShadow=true;
-    const arr=Array.isArray(ch.material)?ch.material:[ch.material];
-    ch.material=arr.map(o=>{const nm=pinkMat(o&&o.name);nm.map=null;
-      if(o&&o.normalMap){nm.normalMap=o.normalMap;nm.normalScale.set(.6,.6);}return nm;});
-    if(ch.material.length===1)ch.material=ch.material[0];
-    // Map Key_Code → mesh for spring animation
-    const nn=ch.name||'';
-    if(nn.startsWith('Key_')&&!nn.includes('part')&&!nn.includes('Extra')){
-      keyMeshMap[nn.replace('Key_','')]=ch;
+  m.traverse(ch=>{
+    // Apply materials to all meshes
+    if(ch.isMesh){
+      ch.castShadow=ch.receiveShadow=true;
+      const arr=Array.isArray(ch.material)?ch.material:[ch.material];
+      ch.material=arr.map(o=>{const nm=pinkMat(o&&o.name);nm.map=null;
+        if(o&&o.normalMap){nm.normalMap=o.normalMap;nm.normalScale.set(.6,.6);}return nm;});
+      if(ch.material.length===1)ch.material=ch.material[0];
     }
-  }});
-  console.log('Keys mapped:',Object.keys(keyMeshMap).length, Object.keys(keyMeshMap));
+    // Map key nodes — the Object3D (parent of mesh) has the node name in GLTF
+    const nn=ch.name||'';
+    if(nn.startsWith('Key_')&&!nn.includes('part')&&!nn.includes('mesh')&&!nn.includes('Extra')){
+      const code=nn.replace('Key_','');
+      if(!keyMeshMap[code]){
+        // Animate the Object3D itself (works whether it's a Mesh or Group)
+        keyMeshMap[code]=ch;
+      }
+    }
+  });
+  console.log('Keys mapped:',Object.keys(keyMeshMap).length);
+  console.log(Object.keys(keyMeshMap).sort().join(', '));
 
   // Normalize: center + scale to fit
   let box=new T.Box3().setFromObject(m);
