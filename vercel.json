@@ -4,7 +4,10 @@
     { "src": "/", "dest": "/typewriter_pink.html" },
     {
       "src": "/(.*)",
-      "headers": { "Access-Control-Allow-Origin": "*" },
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "public, max-age=31536000, immutable"
+      },
       "dest": "/$1"
     }
   ]
