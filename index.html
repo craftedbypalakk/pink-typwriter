@@ -131,8 +131,9 @@ function buildPaper(cx,cy,cz,worldW,worldTopY,worldFrontZ){
   const mat=new T.MeshStandardMaterial({map:ptex,roughness:.9,metalness:0,envMap:env,envMapIntensity:.15,side:T.DoubleSide});
   paperMesh=new T.Mesh(geo,mat);paperMesh.castShadow=true;
   paperGrp=new T.Group();paperGrp.add(paperMesh);
-  // place paper standing up, centered on model, rising above the top, at the front
-  paperGrp.position.set(cx, worldTopY+ph*0.30, worldFrontZ);
+  // Lower the sheet so its bottom ~half sits down inside the platen,
+  // only the upper portion rises above the roller (looks inserted).
+  paperGrp.position.set(cx, worldTopY - ph*0.10, worldFrontZ);
   paperGrp.rotation.x=-0.14;
   paperGrp.userData.baseX=cx;
   scene.add(paperGrp);
@@ -165,10 +166,52 @@ function newline(){curRow++;curCol=0;if(!text[curRow])text[curRow]=[];
 function backspace(){if(curCol>0){curCol--;text[curRow][curCol]=" ";text[curRow].length=Math.max(curCol,0);}
   else if(curRow>0){curRow--;curCol=(text[curRow]||[]).length;}}
 
+// Key mesh map — populated after model loads
+const keyMeshMap = {};
+const keyAnims = {}; // active spring animations per key
+
+function animKeyDown(code){
+  const obj = keyMeshMap[code];
+  if(!obj) return;
+  // Cancel any running animation
+  if(keyAnims[code]) cancelAnimationFrame(keyAnims[code]);
+  // Press: move down 0.25 units and tilt slightly
+  const origY = obj.userData.origY ?? obj.position.y;
+  const origRx = obj.userData.origRx ?? obj.rotation.x;
+  if(obj.userData.origY===undefined){ obj.userData.origY=origY; obj.userData.origRx=origRx; }
+  obj.position.y = origY - 0.25;
+  obj.rotation.x = origRx + 0.04;
+}
+
+function animKeyUp(code){
+  const obj = keyMeshMap[code];
+  if(!obj) return;
+  const origY = obj.userData.origY ?? obj.position.y;
+  const origRx = obj.userData.origRx ?? obj.rotation.x;
+  // Spring return
+  let t=0;
+  const dur=120;
+  const startY=obj.position.y;
+  const startRx=obj.rotation.x;
+  const t0s=performance.now();
+  function spring(now){
+    const dt=now-t0s;
+    const p=Math.min(dt/dur,1);
+    // ease out elastic
+    const ease=p===1?1:1-Math.pow(2,-10*p)*Math.cos((p*10-0.75)*Math.PI*2/3);
+    obj.position.y=startY+(origY-startY)*ease;
+    obj.rotation.x=startRx+(origRx-startRx)*ease;
+    if(p<1) keyAnims[code]=requestAnimationFrame(spring);
+    else { obj.position.y=origY; obj.rotation.x=origRx; }
+  }
+  keyAnims[code]=requestAnimationFrame(spring);
+}
+
 addEventListener("keydown",e=>{
   if(AC&&AC.state==="suspended")AC.resume();
   if(!hintGone){hint.style.display="none";hintGone=true;}
   if(e.metaKey||e.ctrlKey||e.altKey)return;
+  animKeyDown(e.code);
   const k=e.key;
   if(k==="Backspace"){e.preventDefault();keyClick();backspace();paperVib=0.25;drawPaper();return;}
   if(k==="Enter"){e.preventDefault();newline();drawPaper();return;}
@@ -180,15 +223,24 @@ addEventListener("keydown",e=>{
     paperVib=0.2;setTimeout(()=>{typeCh(c);drawPaper();},50);}
 });
 
+addEventListener("keyup",e=>{ animKeyUp(e.code); });
+
 // ── Load model ──
-new T.GLTFLoader().load("typewriter.glb",g=>{
+new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
   setP(90);
   const m=g.scene;
   m.traverse(ch=>{if(ch.isMesh){ch.castShadow=ch.receiveShadow=true;
     const arr=Array.isArray(ch.material)?ch.material:[ch.material];
     ch.material=arr.map(o=>{const nm=pinkMat(o&&o.name);nm.map=null;
       if(o&&o.normalMap){nm.normalMap=o.normalMap;nm.normalScale.set(.6,.6);}return nm;});
-    if(ch.material.length===1)ch.material=ch.material[0];}});
+    if(ch.material.length===1)ch.material=ch.material[0];
+    // Map Key_Code → mesh for spring animation
+    const nn=ch.name||'';
+    if(nn.startsWith('Key_')&&!nn.includes('part')&&!nn.includes('Extra')){
+      keyMeshMap[nn.replace('Key_','')]=ch;
+    }
+  }});
+  console.log('Keys mapped:',Object.keys(keyMeshMap).length, Object.keys(keyMeshMap));
 
   // Normalize: center + scale to fit
   let box=new T.Box3().setFromObject(m);
@@ -216,7 +268,7 @@ new T.GLTFLoader().load("typewriter.glb",g=>{
 
   // Paper: figure out which axis is "up" and "front"
   // Place paper centered on X, above the top (max Y), at the front (max Z)
-  buildPaper(c.x, c.y, c.z, s.x, box.max.y, box.max.z*0.4);
+  buildPaper(c.x, c.y, c.z, s.x, box.max.y, box.max.z*0.05);
 
   setP(100);
   setTimeout(()=>document.getElementById("loader").classList.add("hide"),400);
