@@ -498,10 +498,10 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
 
   // Camera: 11° elevation, model fills 80% viewport
   const FOV_RAD=cam.fov*Math.PI/180;
-  const dist=(s.y/2)/Math.tan(FOV_RAD/2)/0.55;
-  const elev=11*Math.PI/180;
+  const dist=(s.y/2)/Math.tan(FOV_RAD/2)/0.42;
+  const elev=14*Math.PI/180;
   cam.position.set(c.x,c.y+dist*Math.sin(elev),c.z+dist*Math.cos(elev));
-  cam.lookAt(c.x,c.y,c.z);cam.updateProjectionMatrix();
+  cam.lookAt(c.x,c.y+s.y*0.08,c.z);cam.updateProjectionMatrix();
 
   drawPaper();
   setP(100);setTimeout(()=>document.getElementById("loader").classList.add("hide"),500);
