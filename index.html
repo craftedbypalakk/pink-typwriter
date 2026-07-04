@@ -168,51 +168,57 @@ function backspace(){if(curCol>0){curCol--;text[curRow][curCol]=" ";text[curRow]
 
 // Key mesh map — populated after model loads
 const keyMeshMap = {};
-const keyAnims = {}; // active spring animations per key
+const keyState = {}; // per key: {pressing, origPos, t}
 
-function animKeyDown(code){
+// The model root has -90° X rotation so world "down" = local -Z on keys
+// Keys should move ~0.3 world units downward when pressed
+// We animate in world space by moving along world Y down
+
+function pressKey(code){
   const obj = keyMeshMap[code];
-  if(!obj) return;
-  // Cancel any running animation
-  if(keyAnims[code]) cancelAnimationFrame(keyAnims[code]);
-  // Press: move down 0.25 units and tilt slightly
-  const origY = obj.userData.origY ?? obj.position.y;
-  const origRx = obj.userData.origRx ?? obj.rotation.x;
-  if(obj.userData.origY===undefined){ obj.userData.origY=origY; obj.userData.origRx=origRx; }
-  obj.position.y = origY - 0.25;
-  obj.rotation.x = origRx + 0.04;
+  if(!obj || keyState[code]?.pressing) return;
+  keyState[code] = { pressing: true };
+
+  // Store world position baseline
+  const wp = new T.Vector3();
+  obj.getWorldPosition(wp);
+  obj.userData.worldBase = wp.clone();
+
+  // Move key: in the model's local space, "pressing down" 
+  // is along +Z (because root is rotated -90° on X)
+  // We modify the node's local translation directly
+  if(obj.userData.origZ === undefined) obj.userData.origZ = obj.position.z;
+  obj.position.z = obj.userData.origZ + 0.6; // press down in local Z
 }
 
-function animKeyUp(code){
+function releaseKey(code){
   const obj = keyMeshMap[code];
   if(!obj) return;
-  const origY = obj.userData.origY ?? obj.position.y;
-  const origRx = obj.userData.origRx ?? obj.rotation.x;
-  // Spring return
-  let t=0;
-  const dur=120;
-  const startY=obj.position.y;
-  const startRx=obj.rotation.x;
-  const t0s=performance.now();
+  if(obj.userData.origZ === undefined) return;
+  keyState[code] = { pressing: false };
+
+  const startZ = obj.position.z;
+  const targetZ = obj.userData.origZ;
+  const t0s = performance.now();
+  const dur = 130;
+
   function spring(now){
-    const dt=now-t0s;
-    const p=Math.min(dt/dur,1);
-    // ease out elastic
-    const ease=p===1?1:1-Math.pow(2,-10*p)*Math.cos((p*10-0.75)*Math.PI*2/3);
-    obj.position.y=startY+(origY-startY)*ease;
-    obj.rotation.x=startRx+(origRx-startRx)*ease;
-    if(p<1) keyAnims[code]=requestAnimationFrame(spring);
-    else { obj.position.y=origY; obj.rotation.x=origRx; }
+    const p = Math.min((now - t0s) / dur, 1);
+    // Elastic ease-out
+    const ease = p >= 1 ? 1 :
+      1 - Math.pow(2, -10*p) * Math.cos((p * 10 - 0.75) * (Math.PI*2/3));
+    obj.position.z = startZ + (targetZ - startZ) * ease;
+    if(p < 1) requestAnimationFrame(spring);
+    else obj.position.z = targetZ;
   }
-  keyAnims[code]=requestAnimationFrame(spring);
+  requestAnimationFrame(spring);
 }
 
 addEventListener("keydown",e=>{
   if(AC&&AC.state==="suspended")AC.resume();
   if(!hintGone){hint.style.display="none";hintGone=true;}
   if(e.metaKey||e.ctrlKey||e.altKey)return;
-  animKeyDown(e.code);
-  const k=e.key;
+  pressKey(e.code);  const k=e.key;
   if(k==="Backspace"){e.preventDefault();keyClick();backspace();paperVib=0.25;drawPaper();return;}
   if(k==="Enter"){e.preventDefault();newline();drawPaper();return;}
   if(k==="CapsLock"){caps=!caps;return;}
@@ -223,7 +229,7 @@ addEventListener("keydown",e=>{
     paperVib=0.2;setTimeout(()=>{typeCh(c);drawPaper();},50);}
 });
 
-addEventListener("keyup",e=>{ animKeyUp(e.code); });
+addEventListener("keyup",e=>{ releaseKey(e.code); });
 
 // ── Load model ──
 new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
