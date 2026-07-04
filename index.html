@@ -218,52 +218,40 @@ function backspace(){
   paperDirty=true;
 }
 
-// ── Key animation ─────────────────────────────────────────────────
-const keyMap={}; // code → Object3D
-let keysReady=false;
 
-function initKeyPressDir(obj){
-  // Called once after model+matrixWorld are set up
-  if(obj.userData.origPos!==undefined) return;
-  obj.userData.origPos=obj.position.clone();
-  // World down = (0,-1,0). Find local equivalent via parent inverse world matrix
-  const par=obj.parent;
-  if(!par){obj.userData.pressDir=new T.Vector3(0,-1,0);return;}
-  const inv=new T.Matrix4().copy(par.matrixWorld).invert();
-  const ld=new T.Vector3(0,-1,0).transformDirection(inv).normalize();
-  obj.userData.pressDir=ld;
-  // Determine actual press distance in local units:
-  // We want ~0.15 world units of travel. 
-  // Get the scale factor from parent world matrix
-  const sc=new T.Vector3();par.matrixWorld.decompose(new T.Vector3(),new T.Quaternion(),sc);
-  const avgScale=(sc.x+sc.y+sc.z)/3;
-  // local units = world units / scale
-  obj.userData.pressDist=0.15/avgScale;
-}
+// ── Key animation ─────────────────────────────────────────────────
+// keyMap: code → array of ALL mesh parts belonging to that key
+// Parts are siblings in GLB (same parent Neri), each is a separate mesh
+// Press direction: local -Z (confirmed: combined quaternion chain = local-Z = world-down)
+// Scale: 0.023 → 6.5 local units ≈ 0.15 world units of travel
+const keyMap = {}; // code → [obj, obj, ...]  (all parts)
+let keysReady = false;
+const PRESS_DIST = -6.5; // local Z units
 
 function pressKey(code){
   if(!keysReady) return;
-  const obj=keyMap[code];
-  if(!obj) return;
-  initKeyPressDir(obj);
-  const d=obj.userData.pressDir;
-  const dist=obj.userData.pressDist;
-  obj.position.copy(obj.userData.origPos).addScaledVector(d,dist);
+  const parts = keyMap[code];
+  if(!parts) return;
+  parts.forEach(obj=>{
+    if(obj.userData.origZ === undefined) obj.userData.origZ = obj.position.z;
+    obj.position.z = obj.userData.origZ + PRESS_DIST;
+  });
 }
 
 function releaseKey(code){
-  const obj=keyMap[code];
-  if(!obj||obj.userData.origPos===undefined) return;
-  const start=obj.position.clone();
-  const target=obj.userData.origPos.clone();
-  const t0=performance.now();
+  const parts = keyMap[code];
+  if(!parts) return;
+  const startZs  = parts.map(o => o.position.z);
+  const targetZs = parts.map(o => o.userData.origZ ?? o.position.z);
+  const t0 = performance.now();
   (function spring(now){
-    const p=Math.min((now-t0)/140,1);
-    // Elastic ease-out
-    const e=p>=1?1:1-Math.pow(2,-10*p)*Math.cos((p*10-.75)*(Math.PI*2/3));
-    obj.position.lerpVectors(start,target,e);
-    if(p<1)requestAnimationFrame(spring);
-    else obj.position.copy(target);
+    const p = Math.min((now-t0)/140, 1);
+    const ease = p>=1 ? 1 : 1-Math.pow(2,-10*p)*Math.cos((p*10-.75)*(Math.PI*2/3));
+    parts.forEach((obj,i)=>{
+      obj.position.z = startZs[i] + (targetZs[i]-startZs[i]) * ease;
+    });
+    if(p < 1) requestAnimationFrame(spring);
+    else parts.forEach((obj,i) => obj.position.z = targetZs[i]);
   })(performance.now());
 }
 
@@ -320,19 +308,33 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
   // CRITICAL: update matrices BEFORE mapping keys so matrixWorld is valid
   m.updateMatrixWorld(true);
 
-  // Map key nodes — traverse AFTER matrixWorld is set
+  // Map key nodes — collect ALL parts (primary + part1 + part2) per key code
+  // Parts are siblings (same parent Neri), so we animate all of them together
+  const keyParts = {}; // code → [obj, obj, obj]
   m.traverse(ch=>{
-    const nn=ch.name||'';
-    if(nn.startsWith('Key_')&&!nn.includes('part')&&!nn.includes('mesh')&&!nn.includes('Extra')){
-      const code=nn.replace('Key_','');
-      if(!keyMap[code]){
-        keyMap[code]=ch;
-        initKeyPressDir(ch); // compute press direction now while matrixWorld is valid
-      }
-    }
+    const nn = ch.name || '';
+    if(!nn.startsWith('Key_')) return;
+    // Extract base code — strip _part suffix and _mesh suffix
+    let base = nn.replace(/_part\d+$/,'').replace(/_mesh$/,'');
+    const code = base.replace('Key_','');
+    // Skip Extra keys and non-key nodes
+    if(code.includes('Extra') || code.includes('Space 1')) return;
+    // Handle duplicate Space (Three.js renames second to 'Key_Space 1')
+    const cleanCode = code.trim();
+    if(!keyParts[cleanCode]) keyParts[cleanCode]=[];
+    keyParts[cleanCode].push(ch);
+  });
+
+  // Build keyMap: code → array of all objects to animate
+  Object.entries(keyParts).forEach(([code, objs])=>{
+    keyMap[code] = objs;
+    // Store origPos for each part
+    objs.forEach(obj=>{
+      obj.userData.origZ = obj.position.z;
+    });
   });
   keysReady=true;
-  console.log('Keys ready:',Object.keys(keyMap).length);
+  console.log('Keys ready:',Object.keys(keyMap).length, Object.keys(keyMap).sort().join(' '));
 
   // World bounds for camera and paper
   const box=new T.Box3().setFromObject(m);
