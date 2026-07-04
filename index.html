@@ -8,50 +8,54 @@
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;overflow:hidden;background:#0a0508}
 canvas{display:block}
-#loader{position:fixed;inset:0;z-index:100;background:radial-gradient(ellipse at 50% 40%,#2a0a1c,#0a0508);
-display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
-transition:opacity .6s;font-family:monospace}
+#loader{position:fixed;inset:0;z-index:100;
+  background:radial-gradient(ellipse at 50% 40%,#2a0a1c,#0a0508);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+  transition:opacity .7s;font-family:monospace}
 #loader.hide{opacity:0;pointer-events:none}
-#lt{font-size:12px;letter-spacing:4px;color:#e090b0}
+#lt{font-size:11px;letter-spacing:5px;color:#e090b0}
 #lb{width:200px;height:2px;background:#3a1828;border-radius:1px;overflow:hidden}
 #lp{height:100%;width:0;background:linear-gradient(90deg,#c8507a,#ff9ec4);transition:width .3s}
-#hint{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);font-size:11px;
-letter-spacing:3px;color:rgba(255,170,205,.55);z-index:10;pointer-events:none;font-family:monospace}
-#mute{position:fixed;top:18px;right:18px;z-index:11;background:rgba(60,20,38,.6);
-border:1px solid rgba(255,150,190,.25);color:#f0a0c0;font-family:monospace;font-size:11px;
-padding:7px 12px;border-radius:6px;cursor:pointer}
+#hint{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
+  font-size:10px;letter-spacing:3px;color:rgba(255,170,205,.45);
+  z-index:10;pointer-events:none;font-family:monospace}
+#mute{position:fixed;top:18px;right:18px;z-index:11;
+  background:rgba(60,20,38,.7);border:1px solid rgba(255,150,190,.2);
+  color:#f0a0c0;font-family:monospace;font-size:10px;letter-spacing:1px;
+  padding:6px 12px;border-radius:4px;cursor:pointer}
 </style>
 </head>
 <body>
 <div id="loader"><div id="lt">LOADING</div><div id="lb"><div id="lp"></div></div></div>
-<div id="hint">CLICK HERE THEN START TYPING</div>
-<button id="mute">SOUND ON</button>
+<div id="hint">CLICK · THEN TYPE</div>
+<button id="mute">♪ SOUND ON</button>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
 const lp=document.getElementById("lp"),setP=p=>lp.style.width=p+"%";
 window.addEventListener("load",()=>{
-  if(!window.THREE){document.getElementById("lt").textContent="ERROR: no THREE";return;}
+  if(!window.THREE){document.getElementById("lt").textContent="ERROR";return;}
   setP(20);init();
 });
 
 function init(){
 const T=THREE;
 
-// ── Renderer ──────────────────────────────────────────────────────
+// ═══ RENDERER ════════════════════════════════════════════════
 const R=new T.WebGLRenderer({antialias:true});
 R.setPixelRatio(Math.min(devicePixelRatio,2));
 R.setSize(innerWidth,innerHeight);
 R.shadowMap.enabled=true;R.shadowMap.type=T.PCFSoftShadowMap;
 R.outputEncoding=T.sRGBEncoding;
 R.toneMapping=T.ACESFilmicToneMapping;
-R.toneMappingExposure=0.95;
+R.toneMappingExposure=0.92; // slightly lower — preserves pink richness
 document.body.appendChild(R.domElement);
 
 const scene=new T.Scene();
 scene.background=new T.Color(0x0a0508);
 
+// Fixed camera — set after model loads
 const cam=new T.PerspectiveCamera(45,innerWidth/innerHeight,.01,5000);
 let camTarget=new T.Vector3();
 addEventListener("resize",()=>{
@@ -59,25 +63,41 @@ addEventListener("resize",()=>{
   R.setSize(innerWidth,innerHeight);
 });
 
-// ── Environment ───────────────────────────────────────────────────
+// ═══ ENVIRONMENT ══════════════════════════════════════════════
 const pmg=new T.PMREMGenerator(R);
 const es=new T.Scene();
-es.add(new T.Mesh(new T.SphereGeometry(50,24,12),new T.MeshBasicMaterial({color:0x141018,side:T.BackSide})));
-[[-9,8,5,0xfff0f4,11,9],[9,4,4,0xf0f0ff,8,8],[0,13,0,0xffffff,14,12],[0,4,-10,0xffd8e8,12,7]].forEach(a=>{
-  const m=new T.Mesh(new T.PlaneGeometry(a[4],a[5]),new T.MeshBasicMaterial({color:a[3]}));
+es.add(new T.Mesh(new T.SphereGeometry(50,24,12),
+  new T.MeshBasicMaterial({color:0x141018,side:T.BackSide})));
+[[-9,8,5,0xfff0f4,11,9],[9,4,4,0xf0f0ff,8,8],
+ [0,13,0,0xffffff,14,12],[0,4,-10,0xffd8e8,12,7]].forEach(a=>{
+  const m=new T.Mesh(new T.PlaneGeometry(a[4],a[5]),
+    new T.MeshBasicMaterial({color:a[3]}));
   m.position.set(a[0],a[1],a[2]);m.lookAt(0,0,0);es.add(m);
 });
-const env=pmg.fromScene(es,.03).texture;scene.environment=env;pmg.dispose();
+const env=pmg.fromScene(es,.03).texture;
+scene.environment=env;pmg.dispose();
 
-// ── Lights ────────────────────────────────────────────────────────
-scene.add(new T.AmbientLight(0xffffff,0.25));
+// ═══ LIGHTS ═══════════════════════════════════════════════════
+scene.add(new T.AmbientLight(0xffffff,0.22));
 const kL=new T.DirectionalLight(0xfff2f6,3.0);kL.position.set(-6,9,6);
 kL.castShadow=true;kL.shadow.mapSize.set(2048,2048);
 kL.shadow.bias=-.0003;kL.shadow.normalBias=.02;scene.add(kL);
-const fL=new T.DirectionalLight(0xdfe4ff,1.0);fL.position.set(7,4,4);scene.add(fL);
-const rimL=new T.DirectionalLight(0xffd0e4,2.2);rimL.position.set(-2,5,-8);scene.add(rimL);
+const fL=new T.DirectionalLight(0xdfe4ff,0.9);fL.position.set(7,4,4);scene.add(fL);
+const rimL=new T.DirectionalLight(0xffd0e4,2.0);rimL.position.set(-2,5,-8);scene.add(rimL);
 
-// ── Materials ─────────────────────────────────────────────────────
+// Contact shadow blob under machine
+const blobC=document.createElement("canvas");blobC.width=blobC.height=256;
+const bx=blobC.getContext("2d");
+const bg=bx.createRadialGradient(128,128,8,128,128,128);
+bg.addColorStop(0,"rgba(0,0,0,0.6)");bg.addColorStop(.5,"rgba(0,0,0,0.25)");
+bg.addColorStop(1,"rgba(0,0,0,0)");
+bx.fillStyle=bg;bx.fillRect(0,0,256,256);
+const blobTex=new T.CanvasTexture(blobC);
+const blob=new T.Mesh(new T.PlaneGeometry(7,5),
+  new T.MeshBasicMaterial({map:blobTex,transparent:true,depthWrite:false}));
+blob.rotation.x=-Math.PI/2;blob.position.y=-1.42;scene.add(blob);
+
+// ═══ MATERIALS ════════════════════════════════════════════════
 const MM=(c,rg,mt,ei=1.0)=>new T.MeshStandardMaterial(
   {color:new T.Color(c),roughness:rg,metalness:mt,envMap:env,envMapIntensity:ei});
 function pinkMat(name){
@@ -93,124 +113,269 @@ function pinkMat(name){
   return MM(0xd8467e,.22,.5,0.9);
 }
 
-// ── Paper canvas ──────────────────────────────────────────────────
-const PW=1024,PH=1400;
+// ═══ PAPER CANVAS ══════════════════════════════════════════════
+// Ivory warm paper, typewriter font, realistic ink
+const PW=1024,PH=1600;
 const pcan=document.createElement("canvas");pcan.width=PW;pcan.height=PH;
 const pctx=pcan.getContext("2d");
-const COLS=44,ROWS=32,MX=90,MY=70,LH=40,FS=28;
+
+// Layout — generous margins like a real typewriter
+const COLS=40;   // chars per line
+const ROWS=28;   // visible lines
+const MX=120;    // left margin (wider than before)
+const MY=110;    // top margin (taller — more space before first line)
+const LH=44;     // line height
+const FS=30;     // font size
 const CW=(PW-MX*2)/COLS;
+
 let lines=[[]],curRow=0,curCol=0,scrollLines=0,caps=false;
 const ptex=new T.CanvasTexture(pcan);
 ptex.encoding=T.sRGBEncoding;
 ptex.anisotropy=R.capabilities.getMaxAnisotropy();
 
-// FIX: draw paper only when content changes, not every frame
-// Store rendered chars separately so ink offsets are stable
-let charOffsets={}; // key="r,c" value={ox,oy,ink}
-function getOffset(r,c){
+// Per-character ink imperfections — stored permanently once set
+const charCache={}; // "r,c" → {ox,oy,ink,skew}
+function imperfect(r,c){
   const k=`${r},${c}`;
-  if(!charOffsets[k]) charOffsets[k]={
-    ox:(Math.random()-.5)*1.4,
-    oy:(Math.random()-.5)*1.4,
-    ink:0.74+Math.random()*0.18
+  if(!charCache[k]) charCache[k]={
+    ox:(Math.random()-.5)*2.2,    // ±1px misalignment
+    oy:(Math.random()-.5)*2.2,
+    ink:0.68+Math.random()*0.28,  // ink density variation
+    skew:(Math.random()-.5)*0.04  // tiny character rotation
   };
-  return charOffsets[k];
+  return charCache[k];
 }
 
-let paperDirty=true; // only redraw when needed
-let cursorVisible=true;
+let paperDirty=true, cursorVisible=true;
 
 function drawPaper(){
-  const g=pctx.createLinearGradient(0,0,0,PH);
-  g.addColorStop(0,"#fdf8ee");g.addColorStop(1,"#f2ead4");
-  pctx.fillStyle=g;pctx.fillRect(0,0,PW,PH);
-  pctx.strokeStyle="rgba(190,70,60,0.22)";pctx.lineWidth=2;
-  pctx.beginPath();pctx.moveTo(MX-16,40);pctx.lineTo(MX-16,PH-40);pctx.stroke();
-  pctx.font=`${FS}px 'Courier New',monospace`;pctx.textBaseline="top";
+  // Warm ivory base — #F8F2E8
+  pctx.fillStyle="#F8F2E8";
+  pctx.fillRect(0,0,PW,PH);
+
+  // Paper grain — subtle noise texture
+  const idata=pctx.getImageData(0,0,PW,PH);
+  const d=idata.data;
+  for(let i=0;i<d.length;i+=4){
+    const n=(Math.random()-.5)*8;
+    d[i]+=n;d[i+1]+=n;d[i+2]+=n;
+  }
+  pctx.putImageData(idata,0,0);
+
+  // Subtle vignette at top (roller shadow)
+  const vg=pctx.createLinearGradient(0,0,0,140);
+  vg.addColorStop(0,"rgba(30,20,10,0.18)");
+  vg.addColorStop(1,"rgba(30,20,10,0)");
+  pctx.fillStyle=vg;pctx.fillRect(0,0,PW,140);
+
+  // Red margin line
+  pctx.strokeStyle="rgba(180,60,50,0.20)";pctx.lineWidth=1.5;
+  pctx.beginPath();pctx.moveTo(MX-20,0);pctx.lineTo(MX-20,PH);pctx.stroke();
+
+  // Horizontal ruled lines (very faint)
+  pctx.strokeStyle="rgba(160,150,120,0.10)";pctx.lineWidth=0.8;
+  for(let i=0;i<ROWS+2;i++){
+    const y=MY+i*LH;
+    pctx.beginPath();pctx.moveTo(0,y+LH-4);pctx.lineTo(PW,y+LH-4);pctx.stroke();
+  }
+
+  // Text
+  pctx.font=`${FS}px 'Courier New',Courier,monospace`;
+  pctx.textBaseline="top";
   for(let r=0;r<lines.length;r++){
-    const sr=r-scrollLines;if(sr<0||sr>=ROWS)continue;
-    const line=lines[r],y=MY+sr*LH;
+    const sr=r-scrollLines;
+    if(sr<0||sr>=ROWS)continue;
+    const line=lines[r];
+    const y=MY+sr*LH;
     for(let c=0;c<line.length;c++){
-      const ch=line[c];if(!ch||ch===" ")continue;
-      const {ox,oy,ink}=getOffset(r,c);
-      pctx.fillStyle=`rgba(28,20,30,${ink})`;
-      pctx.fillText(ch,MX+c*CW+ox,y+oy);
+      const ch=line[c];
+      if(!ch||ch===" ")continue;
+      const {ox,oy,ink,skew}=imperfect(r,c);
+      const x=MX+c*CW+ox;
+      pctx.save();
+      pctx.translate(x,y+oy);
+      pctx.rotate(skew);
+      pctx.fillStyle=`rgba(22,16,24,${ink})`;
+      pctx.fillText(ch,0,0);
+      pctx.restore();
     }
   }
-  // cursor
+
+  // Cursor — thin underscore style
   const sr=curRow-scrollLines;
   if(cursorVisible&&sr>=0&&sr<ROWS){
-    pctx.fillStyle="rgba(40,30,40,0.7)";
-    pctx.fillRect(MX+curCol*CW,MY+sr*LH+LH-4,CW*0.8,3);
+    pctx.fillStyle="rgba(40,28,44,0.75)";
+    pctx.fillRect(MX+curCol*CW,MY+sr*LH+LH-6,CW*0.7,2.5);
   }
+
   ptex.needsUpdate=true;
   paperDirty=false;
 }
 
+// Paper mesh — positioned deep in platen, only 35-40% visible
 let paperMesh,paperGrp;
-function buildPaper(modelBox,modelScale){
-  // Place paper so it sits inside the platen — only top portion visible
-  const s=modelBox.getSize(new T.Vector3());
-  const c=modelBox.getCenter(new T.Vector3());
-  const pw=s.x*0.52, ph=pw*(PH/PW);
-  const geo=new T.PlaneGeometry(pw,ph);
+let paperBaseY=0, paperFeedY=0; // for paper feed animation
+
+function buildPaper(box){
+  const s=box.getSize(new T.Vector3());
+  const c=box.getCenter(new T.Vector3());
+  const pw=s.x*0.50, ph=pw*(PH/PW);
+
+  // Slightly curved geometry to simulate roller wrap
+  const geo=new T.PlaneGeometry(pw,ph,1,12); // 12 height segments for curve
+  const pos=geo.attributes.position;
+  // Bend the bottom of the paper slightly toward the camera (roller curve)
+  for(let i=0;i<pos.count;i++){
+    const y=pos.getY(i); // -ph/2 to +ph/2
+    const t=(y/(ph/2)+1)/2; // 0=bottom, 1=top
+    // Curve bottom toward viewer
+    const curve=Math.pow(1-t,2)*0.08*pw;
+    pos.setZ(i,curve);
+  }
+  pos.needsUpdate=true;
+  geo.computeVertexNormals();
+
   const mat=new T.MeshStandardMaterial({
-    map:ptex,roughness:.9,metalness:0,
-    envMap:env,envMapIntensity:.15,side:T.DoubleSide
+    map:ptex,roughness:.92,metalness:0,
+    envMap:env,envMapIntensity:.12,
+    side:T.DoubleSide
   });
   paperMesh=new T.Mesh(geo,mat);
-  paperGrp=new T.Group();paperGrp.add(paperMesh);
-  // Paper center at model top - ph*0.1 so bottom 60% is inside platen
-  paperGrp.position.set(c.x, modelBox.max.y - ph*0.12, c.z+s.z*0.08);
-  paperGrp.rotation.x=-0.12;
+  paperMesh.castShadow=true;
+
+  paperGrp=new T.Group();
+  paperGrp.add(paperMesh);
+
+  // Position: sink paper so ~65% is behind/inside the platen
+  // Only the top 35% sticks out
+  paperBaseY = box.max.y - ph*0.40; // 40% above the top
+  paperFeedY = 0;
+
+  paperGrp.position.set(c.x, paperBaseY, c.z+s.z*0.06);
+  paperGrp.rotation.x=-0.10; // slight backward lean
   paperGrp.userData.baseX=c.x;
+  paperGrp.userData.baseY=paperBaseY;
   scene.add(paperGrp);
   drawPaper();
 }
 
-// ── Sounds ────────────────────────────────────────────────────────
+// ═══ SOUNDS ═══════════════════════════════════════════════════
 let AC=null,muted=false;
 const ac=()=>{if(!AC)AC=new(window.AudioContext||window.webkitAudioContext)();return AC;};
-function sndKey(){if(muted)return;const c=ac(),t=c.currentTime;
-  const o=c.createOscillator(),g=c.createGain();
-  o.type="square";o.frequency.value=1500+Math.random()*400;
-  g.gain.setValueAtTime(.05,t);g.gain.exponentialRampToValueAtTime(.001,t+.04);
-  o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+.05);}
-function sndBell(){if(muted)return;const c=ac(),t=c.currentTime;
-  [1660,2490].forEach((f,i)=>{const o=c.createOscillator(),g=c.createGain();
-    o.frequency.value=f;o.type="sine";
-    g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.12/(i+1),t+.005);
-    g.gain.exponentialRampToValueAtTime(.0001,t+1);
-    o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+1.1);});}
-function sndReturn(){if(muted)return;const c=ac(),t=c.currentTime;
-  for(let i=0;i<9;i++){const tt=t+i*.03,o=c.createOscillator(),g=c.createGain();
-    o.type="square";o.frequency.value=900+Math.random()*300;
-    g.gain.setValueAtTime(.04,tt);g.gain.exponentialRampToValueAtTime(.001,tt+.02);
-    o.connect(g);g.connect(c.destination);o.start(tt);o.stop(tt+.03);}}
-document.getElementById("mute").onclick=e=>{
-  muted=!muted;e.target.textContent=muted?"SOUND OFF":"SOUND ON";e.target.blur();};
 
-// ── Typing logic ──────────────────────────────────────────────────
+function sndKey(){
+  if(muted)return;const c=ac(),t=c.currentTime;
+  // Sharp mechanical click — layered
+  const buf=c.createBuffer(1,c.sampleRate*.06,c.sampleRate);
+  const d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,4)*0.6;
+  const src=c.createBufferSource();src.buffer=buf;
+  const g=c.createGain();g.gain.value=0.22;
+  src.connect(g);g.connect(c.destination);src.start(t);
+  // Tonal thwack
+  const o=c.createOscillator(),og=c.createGain();
+  o.frequency.value=180+Math.random()*80;o.type="sine";
+  og.gain.setValueAtTime(.08,t);og.gain.exponentialRampToValueAtTime(.001,t+.05);
+  o.connect(og);og.connect(c.destination);o.start(t);o.stop(t+.06);
+}
+
+function sndSpace(){
+  if(muted)return;const c=ac(),t=c.currentTime;
+  const o=c.createOscillator(),g=c.createGain();
+  o.frequency.value=260;o.type="sine";
+  g.gain.setValueAtTime(.10,t);g.gain.exponentialRampToValueAtTime(.001,t+.07);
+  o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+.08);
+}
+
+function sndBell(){
+  if(muted)return;const c=ac(),t=c.currentTime;
+  [1760,3520,5280].forEach((f,i)=>{
+    const o=c.createOscillator(),g=c.createGain();
+    o.frequency.value=f;o.type="sine";
+    g.gain.setValueAtTime(.0001,t);
+    g.gain.exponentialRampToValueAtTime(.15/(i+1),t+.003);
+    g.gain.exponentialRampToValueAtTime(.0001,t+1.4-i*.3);
+    o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+1.5);
+  });
+}
+
+function sndReturn(){
+  if(muted)return;const c=ac(),t=c.currentTime;
+  // Ratchet clicks
+  for(let i=0;i<14;i++){
+    const tt=t+i*.018+Math.random()*.006;
+    const o=c.createOscillator(),g=c.createGain();
+    o.type="square";o.frequency.value=400+Math.random()*200;
+    g.gain.setValueAtTime(.04,tt);g.gain.exponentialRampToValueAtTime(.001,tt+.015);
+    o.connect(g);g.connect(c.destination);o.start(tt);o.stop(tt+.02);
+  }
+  // Thunk at end
+  const o=c.createOscillator(),g=c.createGain();
+  o.frequency.value=120;o.type="sine";
+  g.gain.setValueAtTime(.14,t+.26);g.gain.exponentialRampToValueAtTime(.001,t+.5);
+  o.connect(g);g.connect(c.destination);o.start(t+.26);o.stop(t+.55);
+}
+
+function sndRoller(){
+  if(muted)return;const c=ac(),t=c.currentTime;
+  const o=c.createOscillator(),g=c.createGain();
+  o.frequency.value=80;o.type="sine";
+  g.gain.setValueAtTime(.06,t);g.gain.exponentialRampToValueAtTime(.001,t+.12);
+  o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+.14);
+}
+
+document.getElementById("mute").onclick=e=>{
+  muted=!muted;e.target.textContent=muted?"♪ MUTED":"♪ SOUND ON";e.target.blur();
+};
+
+// ═══ MACHINE STATE — carriage, platen, ribbon ══════════════════
+let modelRoot=null;
+// These track visual animation targets (not real model bones — cosmetic offsets)
+let carriageX=0;        // current visual carriage position (col units)
+let machineVibX=0, machineVibY=0, machineVibRot=0; // impulse vibration
+let platenRot=0;        // accumulated platen visual rotation
+let ribbonPhase=0;      // ribbon scroll offset
+
+// Find carriage-related meshes after load (Chrome/platen group)
+let platens=[], carriageMeshes=[], ribbonMeshes=[];
+
+function kickMachineVib(){
+  // Small random impulse — decays in render loop
+  machineVibX+=(Math.random()-.5)*0.008;
+  machineVibY+=Math.random()*0.006;
+  machineVibRot+=(Math.random()-.5)*0.003;
+}
+
+// ═══ TYPING LOGIC ═════════════════════════════════════════════
 let paperVib=0;
 const hint=document.getElementById("hint");let hintGone=false;
+
 function typeCh(ch){
   if(!lines[curRow])lines[curRow]=[];
   lines[curRow][curCol]=ch;
   curCol++;
-  if(curCol===COLS-5)sndBell();
-  if(curCol>=COLS)newline();
+  if(curCol===COLS-4) sndBell(); // bell near right margin
+  if(curCol>=COLS) doNewline();
   paperDirty=true;
+  // Advance platen slightly per character
+  platenRot+=0.015;
+  ribbonPhase+=0.5;
 }
-function newline(){
+
+function doNewline(){
   curRow++;curCol=0;
   if(!lines[curRow])lines[curRow]=[];
-  if(curRow-scrollLines>=ROWS-3)scrollLines++;
-  sndReturn();paperVib=0.4;paperDirty=true;
+  if(curRow-scrollLines>=ROWS-2) scrollLines++;
+  // Paper feed: move paper up by one line height in world space
+  // LH pixels on PH canvas → LH/PH fraction of paper height
+  paperFeedY+=0.5; // accumulate upward feed
+  paperDirty=true;
 }
+
 function backspace(){
   if(curCol>0){
     curCol--;
-    delete charOffsets[`${curRow},${curCol}`]; // remove stored offset
+    delete charCache[`${curRow},${curCol}`];
     if(lines[curRow])lines[curRow][curCol]=null;
   } else if(curRow>0){
     curRow--;curCol=(lines[curRow]||[]).length;
@@ -218,74 +383,95 @@ function backspace(){
   paperDirty=true;
 }
 
-
-// ── Key animation ─────────────────────────────────────────────────
-// keyMap: code → array of ALL mesh parts belonging to that key
-// Parts are siblings in GLB (same parent Neri), each is a separate mesh
-// Press direction: local -Z (confirmed: combined quaternion chain = local-Z = world-down)
-// Scale: 0.023 → 6.5 local units ≈ 0.15 world units of travel
-const keyMap = {}; // code → [obj, obj, ...]  (all parts)
-let keysReady = false;
-const PRESS_DIST = -6.5; // local Z units
+// ═══ KEY ANIMATION ════════════════════════════════════════════
+const keyMap={};let keysReady=false;
+const PRESS_DIST=-1.2; // local Z
 
 function pressKey(code){
-  if(!keysReady) return;
-  const parts = keyMap[code];
-  if(!parts) return;
+  if(!keysReady)return;
+  const parts=keyMap[code];if(!parts)return;
   parts.forEach(obj=>{
-    if(obj.userData.origZ === undefined) obj.userData.origZ = obj.position.z;
-    obj.position.z = obj.userData.origZ + PRESS_DIST;
+    if(obj.userData.origZ===undefined)obj.userData.origZ=obj.position.z;
+    obj.position.z=obj.userData.origZ+PRESS_DIST;
   });
 }
 
 function releaseKey(code){
-  const parts = keyMap[code];
-  if(!parts) return;
-  const startZs  = parts.map(o => o.position.z);
-  const targetZs = parts.map(o => o.userData.origZ ?? o.position.z);
-  const t0 = performance.now();
+  const parts=keyMap[code];if(!parts)return;
+  const s0=parts.map(o=>o.position.z);
+  const t0=parts.map(o=>o.userData.origZ??o.position.z);
+  const ts=performance.now();
   (function spring(now){
-    const p = Math.min((now-t0)/140, 1);
-    const ease = p>=1 ? 1 : 1-Math.pow(2,-10*p)*Math.cos((p*10-.75)*(Math.PI*2/3));
-    parts.forEach((obj,i)=>{
-      obj.position.z = startZs[i] + (targetZs[i]-startZs[i]) * ease;
-    });
-    if(p < 1) requestAnimationFrame(spring);
-    else parts.forEach((obj,i) => obj.position.z = targetZs[i]);
+    const p=Math.min((now-ts)/130,1);
+    const e=p>=1?1:1-Math.pow(2,-10*p)*Math.cos((p*10-.75)*(Math.PI*2/3));
+    parts.forEach((obj,i)=>obj.position.z=s0[i]+(t0[i]-s0[i])*e);
+    if(p<1)requestAnimationFrame(spring);
+    else parts.forEach((obj,i)=>obj.position.z=t0[i]);
   })(performance.now());
 }
 
-// ── Keyboard events ───────────────────────────────────────────────
+// Enter carriage return animation
+let carriageReturning=false;
+function doCarriageReturn(){
+  if(carriageReturning)return;
+  carriageReturning=true;
+  sndReturn();
+  sndRoller();
+  // Animate paper feed upward
+  const startFeed=paperFeedY;
+  const targetFeed=paperFeedY; // already incremented in doNewline
+  // Quick carriage return — eases out over 280ms
+  const ts=performance.now();
+  (function cr(now){
+    const p=Math.min((now-ts)/280,1);
+    const e=1-Math.pow(1-p,3); // ease out cubic
+    if(paperGrp){
+      paperGrp.position.y=paperGrp.userData.baseY+paperFeedY*0.44;
+    }
+    if(p<1)requestAnimationFrame(cr);
+    else carriageReturning=false;
+  })(performance.now());
+}
+
+// ═══ KEYBOARD EVENTS ══════════════════════════════════════════
 addEventListener("keydown",e=>{
   if(AC&&AC.state==="suspended")AC.resume();
   if(!hintGone){hint.style.display="none";hintGone=true;}
-  if(e.metaKey||e.ctrlKey||e.altKey) return;
+  if(e.metaKey||e.ctrlKey||e.altKey)return;
   pressKey(e.code);
   const k=e.key;
-  if(k==="Backspace"){e.preventDefault();sndKey();backspace();paperVib=0.25;return;}
-  if(k==="Enter"){e.preventDefault();newline();return;}
+  if(k==="Backspace"){
+    e.preventDefault();sndKey();backspace();paperVib=0.2;kickMachineVib();return;
+  }
+  if(k==="Enter"){
+    e.preventDefault();doNewline();doCarriageReturn();
+    paperVib=0.5;kickMachineVib();return;
+  }
   if(k==="CapsLock"){caps=!caps;return;}
   if(k==="Shift"||k==="Tab"||k==="Escape"||k.startsWith("Arrow")||
      k==="Control"||k==="Alt"||k==="Meta"){if(k==="Tab")e.preventDefault();return;}
-  if(k===" "){e.preventDefault();sndKey();paperVib=0.15;
-    setTimeout(()=>{typeCh(" ");},30);return;}
-  if(k.length===1){e.preventDefault();sndKey();
+  if(k===" "){
+    e.preventDefault();sndSpace();paperVib=0.18;kickMachineVib();
+    setTimeout(()=>typeCh(" "),30);return;
+  }
+  if(k.length===1){
+    e.preventDefault();sndKey();kickMachineVib();paperVib=0.22;
     let c=k;
     if(caps&&/[a-z]/.test(c))c=c.toUpperCase();
     else if(caps&&/[A-Z]/.test(c)&&!e.shiftKey)c=c.toLowerCase();
-    paperVib=0.2;
-    setTimeout(()=>{typeCh(c);},50);}
+    // Delay print 40-60ms — typebar travel time
+    setTimeout(()=>typeCh(c),42+Math.random()*18);
+  }
 });
 addEventListener("keyup",e=>releaseKey(e.code));
 
-// ── Load model ────────────────────────────────────────────────────
+// ═══ LOAD MODEL ═══════════════════════════════════════════════
 new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
   setP(90);
   const m=g.scene;
-
-  // Apply materials
+  // Apply pink materials
   m.traverse(ch=>{
-    if(!ch.isMesh) return;
+    if(!ch.isMesh)return;
     ch.castShadow=ch.receiveShadow=true;
     const arr=Array.isArray(ch.material)?ch.material:[ch.material];
     ch.material=arr.map(o=>{
@@ -294,97 +480,118 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
       return nm;
     });
     if(ch.material.length===1)ch.material=ch.material[0];
+    // Collect platen/chrome meshes for subtle animation
+    const n=(ch.name||"").toLowerCase();
+    if(n.includes("chrome")||n.includes("platen")||n.includes("knob"))
+      platens.push(ch);
+    if(n.includes("ribbon")||n.includes("tape"))
+      ribbonMeshes.push(ch);
   });
 
   // Scale and center
-  const box0=new T.Box3().setFromObject(m);
-  const c0=box0.getCenter(new T.Vector3());
-  const s0=box0.getSize(new T.Vector3());
+  const b0=new T.Box3().setFromObject(m);
+  const c0=b0.getCenter(new T.Vector3());
+  const s0=b0.getSize(new T.Vector3());
   const scl=4/Math.max(s0.x,s0.y,s0.z);
   m.scale.setScalar(scl);
   m.position.set(-c0.x*scl,-c0.y*scl,-c0.z*scl);
   scene.add(m);
-
-  // CRITICAL: update matrices BEFORE mapping keys so matrixWorld is valid
+  modelRoot=m;
   m.updateMatrixWorld(true);
 
-  // Map key nodes — collect ALL parts (primary + part1 + part2) per key code
-  // Parts are siblings (same parent Neri), so we animate all of them together
-  const keyParts = {}; // code → [obj, obj, obj]
+  // Map key parts
+  const kp={};
   m.traverse(ch=>{
-    const nn = ch.name || '';
-    if(!nn.startsWith('Key_')) return;
-    // Extract base code — strip _part suffix and _mesh suffix
-    let base = nn.replace(/_part\d+$/,'').replace(/_mesh$/,'');
-    const code = base.replace('Key_','');
-    // Skip Extra keys and non-key nodes
-    if(code.includes('Extra') || code.includes('Space 1')) return;
-    // Handle duplicate Space (Three.js renames second to 'Key_Space 1')
-    const cleanCode = code.trim();
-    if(!keyParts[cleanCode]) keyParts[cleanCode]=[];
-    keyParts[cleanCode].push(ch);
+    const nn=ch.name||"";
+    if(!nn.startsWith("Key_"))return;
+    let base=nn.replace(/_part\d+$/,"").replace(/_mesh$/,"");
+    const code=base.replace("Key_","").trim();
+    if(code.includes("Extra"))return;
+    if(!kp[code])kp[code]=[];
+    kp[code].push(ch);
   });
-
-  // Build keyMap: code → array of all objects to animate
-  Object.entries(keyParts).forEach(([code, objs])=>{
-    keyMap[code] = objs;
-    // Store origPos for each part
-    objs.forEach(obj=>{
-      obj.userData.origZ = obj.position.z;
-    });
+  Object.entries(kp).forEach(([code,objs])=>{
+    keyMap[code]=objs;
+    objs.forEach(o=>o.userData.origZ=o.position.z);
   });
   keysReady=true;
-  console.log('Keys ready:',Object.keys(keyMap).length, Object.keys(keyMap).sort().join(' '));
+  console.log("Keys:",Object.keys(keyMap).length);
 
-  // World bounds for camera and paper
+  // Bounds for camera + paper
   const box=new T.Box3().setFromObject(m);
   const c=box.getCenter(new T.Vector3());
   const s=box.getSize(new T.Vector3());
 
   // Shadow floor
-  const sf=new T.Mesh(new T.PlaneGeometry(s.x*4,s.z*4),new T.ShadowMaterial({opacity:.5}));
+  const sf=new T.Mesh(new T.PlaneGeometry(s.x*5,s.z*5),
+    new T.ShadowMaterial({opacity:.45}));
   sf.rotation.x=-Math.PI/2;sf.position.y=box.min.y;sf.receiveShadow=true;scene.add(sf);
+  blob.position.y=box.min.y+0.01;
+  blob.scale.set(s.x/5,1,s.z/3.5);
 
-  // Camera
+  // Fixed camera — front, slightly elevated
   const maxDim=Math.max(s.x,s.y,s.z);
-  const dist=maxDim*1.9;
-  cam.position.set(c.x,c.y+maxDim*0.35,c.z+dist);
+  cam.position.set(c.x,c.y+maxDim*.32,c.z+maxDim*1.85);
   camTarget.copy(c);
   cam.lookAt(camTarget);
 
-  // Paper
-  buildPaper(box,scl);
+  // Build paper
+  buildPaper(box);
 
   setP(100);
-  setTimeout(()=>document.getElementById("loader").classList.add("hide"),400);
+  setTimeout(()=>document.getElementById("loader").classList.add("hide"),500);
 },
 xhr=>{if(xhr.total)setP(20+xhr.loaded/xhr.total*70);},
-err=>{console.error(err);document.getElementById("lt").textContent="ERROR: "+err.message;});
+err=>{console.error(err);document.getElementById("lt").textContent="ERROR";});
 
-// ── Render loop ───────────────────────────────────────────────────
-let paperVibX=0;
-let cursorTimer=0;
-let t0=performance.now();
+// ═══ RENDER LOOP ══════════════════════════════════════════════
+let cursorTimer=0,t0=performance.now();
+
 (function loop(now){
   requestAnimationFrame(loop);
   const dt=Math.min((now-t0)/1000,.05);t0=now;
 
+  // Machine vibration decay
+  machineVibX*=0.78;machineVibY*=0.78;machineVibRot*=0.78;
+  if(modelRoot){
+    modelRoot.position.x+=machineVibX;
+    modelRoot.position.y+=machineVibY;
+    modelRoot.rotation.z=machineVibRot;
+  }
+
   // Paper vibration decay
-  if(paperVib>0){paperVib*=0.82;if(paperVib<0.001)paperVib=0;}
+  if(paperVib>0){paperVib*=0.80;if(paperVib<0.001)paperVib=0;}
   if(paperGrp&&paperVib>0){
-    paperGrp.position.x=paperGrp.userData.baseX+(Math.random()-.5)*paperVib*0.04;
+    paperGrp.position.x=paperGrp.userData.baseX+(Math.random()-.5)*paperVib*0.035;
+    paperGrp.rotation.z=(Math.random()-.5)*paperVib*0.008;
   }
 
-  // Cursor blink — redraw paper only when cursor state changes
+  // Paper feed position
+  if(paperGrp&&!carriageReturning){
+    const targetY=paperGrp.userData.baseY+paperFeedY*0.44;
+    paperGrp.position.y+=(targetY-paperGrp.position.y)*0.12;
+  }
+
+  // Platen subtle rotation (visual only)
+  if(platens.length>0&&platenRot>0){
+    platenRot*=0.92;
+    platens.forEach(p=>p.rotation.z=(p.userData.baseRotZ||0)+platenRot);
+  }
+
+  // Ribbon scroll (UV offset)
+  if(ribbonMeshes.length>0){
+    ribbonMeshes.forEach(r=>{
+      if(r.material&&r.material.map)
+        r.material.map.offset.x=(ribbonPhase*0.001)%1;
+    });
+  }
+
+  // Cursor blink
   cursorTimer+=dt;
-  const newCursorVisible=Math.floor(cursorTimer/0.5)%2===0;
-  if(newCursorVisible!==cursorVisible){
-    cursorVisible=newCursorVisible;
-    paperDirty=true;
-  }
+  const cv=Math.floor(cursorTimer/.5)%2===0;
+  if(cv!==cursorVisible){cursorVisible=cv;paperDirty=true;}
 
-  // Only redraw paper when content actually changed
-  if(paperDirty) drawPaper();
+  if(paperDirty)drawPaper();
 
   R.render(scene,cam);
 })(performance.now());
