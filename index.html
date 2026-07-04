@@ -239,8 +239,8 @@ function buildPaper(box){
   paperGrp=new T.Group();
   paperGrp.add(paperMesh);
 
-  // Position: sink paper so only top 20% sticks out above platen
-  paperBaseY = box.max.y - ph*0.72; // 72% below top = only 28% visible
+  // Position: paper center sits AT the platen top — mostly hidden inside
+  paperBaseY = box.max.y + ph*0.05; // center just above top, 95% hidden inside
   paperFeedY = 0;
 
   paperGrp.position.set(c.x, paperBaseY, c.z+s.z*0.06);
