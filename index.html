@@ -201,13 +201,6 @@ function drawPaper(){
     }
   }
 
-  // Cursor — thin underscore style
-  const sr=curRow-scrollLines;
-  if(cursorVisible&&sr>=0&&sr<ROWS){
-    pctx.fillStyle="rgba(40,28,44,0.75)";
-    pctx.fillRect(MX+curCol*CW,MY+sr*LH+LH-6,CW*0.7,2.5);
-  }
-
   ptex.needsUpdate=true;
   paperDirty=false;
 }
@@ -246,9 +239,8 @@ function buildPaper(box){
   paperGrp=new T.Group();
   paperGrp.add(paperMesh);
 
-  // Position: sink paper so ~65% is behind/inside the platen
-  // Only the top 35% sticks out
-  paperBaseY = box.max.y - ph*0.40; // 40% above the top
+  // Position: sink paper so only top 20% sticks out above platen
+  paperBaseY = box.max.y - ph*0.72; // 72% below top = only 28% visible
   paperFeedY = 0;
 
   paperGrp.position.set(c.x, paperBaseY, c.z+s.z*0.06);
@@ -340,10 +332,9 @@ let ribbonPhase=0;      // ribbon scroll offset
 let platens=[], carriageMeshes=[], ribbonMeshes=[];
 
 function kickMachineVib(){
-  // Small random impulse — decays in render loop
-  machineVibX+=(Math.random()-.5)*0.008;
-  machineVibY+=Math.random()*0.006;
-  machineVibRot+=(Math.random()-.5)*0.003;
+  machineVibX+=(Math.random()-.5)*0.004;
+  machineVibY+=(Math.random()-.5)*0.003;
+  machineVibRot+=(Math.random()-.5)*0.002;
 }
 
 // ═══ TYPING LOGIC ═════════════════════════════════════════════
@@ -497,6 +488,9 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
   m.position.set(-c0.x*scl,-c0.y*scl,-c0.z*scl);
   scene.add(m);
   modelRoot=m;
+  // Store base position so vibration oscillates around it
+  m.userData.baseX=m.position.x;
+  m.userData.baseY=m.position.y;
   m.updateMatrixWorld(true);
 
   // Map key parts
@@ -551,11 +545,11 @@ let cursorTimer=0,t0=performance.now();
   requestAnimationFrame(loop);
   const dt=Math.min((now-t0)/1000,.05);t0=now;
 
-  // Machine vibration decay
-  machineVibX*=0.78;machineVibY*=0.78;machineVibRot*=0.78;
+  // Machine vibration decay — oscillate around origin, not accumulate
+  machineVibX*=0.72;machineVibY*=0.72;machineVibRot*=0.72;
   if(modelRoot){
-    modelRoot.position.x+=machineVibX;
-    modelRoot.position.y+=machineVibY;
+    modelRoot.position.x=modelRoot.userData.baseX+(machineVibX);
+    modelRoot.position.y=modelRoot.userData.baseY+(machineVibY);
     modelRoot.rotation.z=machineVibRot;
   }
 
@@ -585,11 +579,6 @@ let cursorTimer=0,t0=performance.now();
         r.material.map.offset.x=(ribbonPhase*0.001)%1;
     });
   }
-
-  // Cursor blink
-  cursorTimer+=dt;
-  const cv=Math.floor(cursorTimer/.5)%2===0;
-  if(cv!==cursorVisible){cursorVisible=cv;paperDirty=true;}
 
   if(paperDirty)drawPaper();
 
