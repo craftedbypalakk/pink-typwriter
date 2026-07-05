@@ -606,7 +606,7 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
   keysReady=true;
   console.log("Keys:",Object.keys(keyMap).length);
 
-  // ── KEY LABELS — draw letter on each key at runtime ───────────
+  // ── KEY LABELS — draw letter on each key cap ──────────────
   const KEY_CHARS={
     "KeyA":"A","KeyB":"B","KeyC":"C","KeyD":"D","KeyE":"E",
     "KeyF":"F","KeyG":"G","KeyH":"H","KeyI":"I","KeyJ":"J",
@@ -620,31 +620,51 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
     "Tab":"TAB","CapsLock":"CAP","Backspace":"DEL",
     "Enter":"RET","ShiftLeft":"SHF","ShiftRight":"SHF",
   };
-  // For each key mesh, replace its material with a canvas-textured one
+
+  const _labelTex={}; // cache textures by label
+  function getLabelTex(label){
+    if(_labelTex[label]) return _labelTex[label];
+    const kc=document.createElement('canvas');kc.width=kc.height=256;
+    const kx=kc.getContext('2d');
+    // Ivory background
+    kx.fillStyle='#F2EADE';kx.fillRect(0,0,256,256);
+    // Dark ink letter
+    const fs=label.length===1?140:label.length===2?90:64;
+    kx.font=`bold ${fs}px 'Courier New',Courier,monospace`;
+    kx.fillStyle='rgba(18,12,20,0.92)';
+    kx.textAlign='center';kx.textBaseline='middle';
+    kx.fillText(label,128,128);
+    const t=new T.CanvasTexture(kc);
+    t.encoding=T.sRGBEncoding;
+    _labelTex[label]=t;
+    return t;
+  }
+
   Object.entries(KEY_CHARS).forEach(([code,label])=>{
     const parts=keyMap[code];
-    if(!parts||!parts.length)return;
-    // Use only the first part (top cap) for the label
-    const cap=parts[0];
-    // Create canvas texture
-    const kc=document.createElement('canvas');kc.width=kc.height=128;
-    const kx=kc.getContext('2d');
-    kx.fillStyle='#F2EADE';kx.fillRect(0,0,128,128);
-    kx.fillStyle='rgba(18,12,20,0.92)';
-    const fs=label.length===1?64:label.length===3?32:28;
-    kx.font=`bold ${fs}px 'Courier New',Courier,monospace`;
-    kx.textAlign='center';kx.textBaseline='middle';
-    kx.fillText(label,64,64);
-    const ktex=new T.CanvasTexture(kc);
-    ktex.encoding=T.sRGBEncoding;
-    // Apply to all parts of this key
+    if(!parts||!parts.length) return;
+    const ktex=getLabelTex(label);
+    // Find the topmost part (highest world Y = top face of key cap)
+    let topPart=parts[0];
+    let topY=-Infinity;
     parts.forEach(obj=>{
-      if(!obj.isMesh)return;
-      const mat=new T.MeshStandardMaterial({
-        map:ktex,roughness:.30,metalness:.04,
+      if(!obj.isMesh) return;
+      const wp=new T.Vector3();
+      obj.getWorldPosition(wp);
+      if(wp.y>topY){topY=wp.y;topPart=obj;}
+    });
+    // Apply ivory+label texture only to the top cap part
+    topPart.material=new T.MeshStandardMaterial({
+      map:ktex,roughness:.30,metalness:.04,
+      envMap:env,envMapIntensity:.45
+    });
+    // Keep remaining parts ivory (no label)
+    parts.forEach(obj=>{
+      if(obj===topPart||!obj.isMesh) return;
+      obj.material=new T.MeshStandardMaterial({
+        color:new T.Color(0xf2eade),roughness:.30,metalness:.04,
         envMap:env,envMapIntensity:.45
       });
-      obj.material=mat;
     });
   });
 
