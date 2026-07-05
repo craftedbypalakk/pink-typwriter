@@ -606,43 +606,50 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
   keysReady=true;
   console.log("Keys:",Object.keys(keyMap).length);
 
-  // ── CHAMPA SIGN — covers the "ROYAL" text on the body ─────
-  // ROYAL sits below the gold label plate, in a recessed panel
-  // Find world position from model bounds — it's ~15% below center, at the front face
-  const signW=s.x*0.30;
-  const signH=signW*(128/512);
-
-  // Build canvas with CHAMPA in chrome style matching original ROYAL letters
-  const sc=document.createElement('canvas');sc.width=512;sc.height=128;
-  const sx=sc.getContext('2d');
-  sx.clearRect(0,0,512,128);
-  // Pink body colour background to erase ROYAL underneath
-  sx.fillStyle='#d8467e'; // match body pink
-  sx.fillRect(0,0,512,128);
-  // Chrome gradient text
-  const tg=sx.createLinearGradient(0,20,0,108);
-  tg.addColorStop(0,'#888898');
-  tg.addColorStop(0.3,'#d8d8e8');
-  tg.addColorStop(0.5,'#b0b0c0');
-  tg.addColorStop(0.7,'#e8e8f4');
-  tg.addColorStop(1,'#686878');
-  sx.fillStyle=tg;
-  sx.font='bold 76px "Arial Narrow",Arial,sans-serif';
-  sx.textAlign='center';sx.textBaseline='middle';
-  sx.shadowColor='rgba(0,0,0,0.6)';sx.shadowBlur=2;sx.shadowOffsetX=1;sx.shadowOffsetY=2;
-  sx.fillText('CHAMPA',256,64);
-  const stex=new T.CanvasTexture(sc);stex.encoding=T.sRGBEncoding;
-
-  const signGeo=new T.PlaneGeometry(signW,signH);
-  const signMat=new T.MeshStandardMaterial({
-    map:stex,roughness:0.25,metalness:0.7,
-    envMap:env,envMapIntensity:1.0,depthWrite:true
+  // ── KEY LABELS — draw letter on each key at runtime ───────────
+  const KEY_CHARS={
+    "KeyA":"A","KeyB":"B","KeyC":"C","KeyD":"D","KeyE":"E",
+    "KeyF":"F","KeyG":"G","KeyH":"H","KeyI":"I","KeyJ":"J",
+    "KeyK":"K","KeyL":"L","KeyM":"M","KeyN":"N","KeyO":"O",
+    "KeyP":"P","KeyQ":"Q","KeyR":"R","KeyS":"S","KeyT":"T",
+    "KeyU":"U","KeyV":"V","KeyW":"W","KeyX":"X","KeyY":"Y","KeyZ":"Z",
+    "Digit1":"1","Digit2":"2","Digit3":"3","Digit4":"4","Digit5":"5",
+    "Digit6":"6","Digit7":"7","Digit8":"8","Digit9":"9","Digit0":"0",
+    "Minus":"-","Semicolon":";","Quote":"'",
+    "Comma":",","Period":".","Slash":"/",
+    "Tab":"TAB","CapsLock":"CAP","Backspace":"DEL",
+    "Enter":"RET","ShiftLeft":"SHF","ShiftRight":"SHF",
+  };
+  // For each key mesh, replace its material with a canvas-textured one
+  Object.entries(KEY_CHARS).forEach(([code,label])=>{
+    const parts=keyMap[code];
+    if(!parts||!parts.length)return;
+    // Use only the first part (top cap) for the label
+    const cap=parts[0];
+    // Create canvas texture
+    const kc=document.createElement('canvas');kc.width=kc.height=128;
+    const kx=kc.getContext('2d');
+    kx.fillStyle='#F2EADE';kx.fillRect(0,0,128,128);
+    kx.fillStyle='rgba(18,12,20,0.92)';
+    const fs=label.length===1?64:label.length===3?32:28;
+    kx.font=`bold ${fs}px 'Courier New',Courier,monospace`;
+    kx.textAlign='center';kx.textBaseline='middle';
+    kx.fillText(label,64,64);
+    const ktex=new T.CanvasTexture(kc);
+    ktex.encoding=T.sRGBEncoding;
+    // Apply to all parts of this key
+    parts.forEach(obj=>{
+      if(!obj.isMesh)return;
+      const mat=new T.MeshStandardMaterial({
+        map:ktex,roughness:.30,metalness:.04,
+        envMap:env,envMapIntensity:.45
+      });
+      obj.material=mat;
+    });
   });
-  const signMesh=new T.Mesh(signGeo,signMat);
-  signMesh.renderOrder=2;
-  // Position: front face of model (box.max.z), lower half (c.y - s.y*0.14)
-  signMesh.position.set(c.x, c.y+s.y*0.08, box.max.z+0.01);
-  scene.add(signMesh);
+
+
+
 
 
   // Shadow floor + contact blobs
@@ -651,11 +658,11 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
 
   // Camera: 11° elevation, model fills 80% viewport
   const FOV_RAD=cam.fov*Math.PI/180;
-  const dist=(s.y/2)/Math.tan(FOV_RAD/2)/0.45;
-  const elev=18*Math.PI/180;
+  const dist=(s.y/2)/Math.tan(FOV_RAD/2)/0.32;
+  const elev=12*Math.PI/180;
   cam.position.set(c.x,c.y+dist*Math.sin(elev),c.z+dist*Math.cos(elev));
   // Look at the platen/paper area — upper third of the machine
-  cam.lookAt(c.x,c.y+s.y*0.25,c.z);
+  cam.lookAt(c.x,c.y,c.z);
   cam.updateProjectionMatrix();
 
   drawPaper();
