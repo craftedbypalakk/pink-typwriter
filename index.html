@@ -92,6 +92,7 @@ sf.rotation.x=-Math.PI/2;sf.receiveShadow=true;scene.add(sf);
 const MM=(c,rg,mt,ei=0.9)=>new T.MeshStandardMaterial({color:new T.Color(c),roughness:rg,metalness:mt,envMap:env,envMapIntensity:ei});
 function pinkMat(name){
   const n=(name||"").toLowerCase();
+  if(n.startsWith('keymat_'))return MM(0xffffff,.30,.04,.45); // white base — texture provides colour
   if(n.includes("chrome"))  return MM(0xeae4ea,.06,1.0,1.8);
   if(n.includes("rubber"))  return MM(0x160810,.88,.1,.08);
   if(n.includes("tape"))    return MM(0x140510,.9,.0,.04);
@@ -126,33 +127,133 @@ function imperfect(r,c){
 }
 
 // Pre-baked grain canvas
+// Pre-bake torn edge path — generated once, stable
+const TORN_PTS=(()=>{
+  let s=0xdeadbeef;
+  const rnd=()=>{s=(s*1664525+1013904223)&0xffffffff;return(s>>>0)/0xffffffff;};
+  const pts=[];
+  const steps=120; // number of jagged points across width
+  for(let i=0;i<=steps;i++){
+    const x=(i/steps)*PW;
+    // Torn edge: large rips + small fibres
+    const rip  = (rnd()-.5)*38;  // big tear
+    const fibre= (rnd()-.5)*10;  // paper fibre fray
+    const y    = 28 + rip + fibre + Math.sin(i*0.7)*6;
+    pts.push({x,y:Math.max(0,y)});
+  }
+  return pts;
+})();
+
 const grainCv=document.createElement("canvas");grainCv.width=PW;grainCv.height=PH;
 (()=>{
   const gc=grainCv.getContext("2d");
-  gc.fillStyle="#F8F2E8";gc.fillRect(0,0,PW,PH);
+  // Aged warm ivory — slightly yellowed, not pure white
+  gc.fillStyle="#EDE4C8";gc.fillRect(0,0,PW,PH);
+  // Stronger grain for aged paper feel
   const gd=gc.getImageData(0,0,PW,PH);const g=gd.data;
   let s=0x9e3779b9;
   const rnd=()=>{s=(s*1664525+1013904223)&0xffffffff;return(s>>>0)/0xffffffff;};
-  for(let i=0;i<g.length;i+=4){const n=(rnd()-.5)*13;g[i]=Math.max(0,Math.min(255,g[i]+n));g[i+1]=Math.max(0,Math.min(255,g[i+1]+n*.95));g[i+2]=Math.max(0,Math.min(255,g[i+2]+n*.84));}
+  for(let i=0;i<g.length;i+=4){
+    const n=(rnd()-.5)*18;
+    g[i]=Math.max(0,Math.min(255,g[i]+n));
+    g[i+1]=Math.max(0,Math.min(255,g[i+1]+n*.92));
+    g[i+2]=Math.max(0,Math.min(255,g[i+2]+n*.72)); // more yellow tint
+  }
   gc.putImageData(gd,0,0);
-  for(let f=0;f<280;f++){const fx=rnd()*PW,fy=rnd()*PH,fl=8+rnd()*20,fa=(rnd()-.5)*.22,al=0.025+rnd()*.055;gc.strokeStyle=rnd()>.5?`rgba(255,248,235,${al})`:`rgba(175,155,120,${al})`;gc.lineWidth=.35+rnd()*.45;gc.beginPath();gc.moveTo(fx,fy);gc.lineTo(fx+Math.cos(fa)*fl,fy+Math.sin(fa)*fl);gc.stroke();}
+  // Age spots — faint brown blotches
+  for(let f=0;f<18;f++){
+    const fx=rnd()*PW,fy=40+rnd()*PH*.3;
+    const fr=8+rnd()*28,al=0.03+rnd()*.06;
+    const ag=gc.createRadialGradient(fx,fy,0,fx,fy,fr);
+    ag.addColorStop(0,`rgba(120,80,20,${al})`);ag.addColorStop(1,"rgba(120,80,20,0)");
+    gc.fillStyle=ag;gc.beginPath();gc.arc(fx,fy,fr,0,Math.PI*2);gc.fill();
+  }
+  // Paper fibres
+  for(let f=0;f<320;f++){
+    const fx=rnd()*PW,fy=rnd()*PH,fl=8+rnd()*22,fa=(rnd()-.5)*.25,al=0.03+rnd()*.06;
+    gc.strokeStyle=rnd()>.5?`rgba(255,245,210,${al})`:`rgba(160,130,70,${al})`;
+    gc.lineWidth=.35+rnd()*.5;
+    gc.beginPath();gc.moveTo(fx,fy);gc.lineTo(fx+Math.cos(fa)*fl,fy+Math.sin(fa)*fl);gc.stroke();
+  }
+  // Torn top edge — white fibrous fringe along the tear line
+  TORN_PTS.forEach((pt,i)=>{
+    if(i===0)return;
+    const prev=TORN_PTS[i-1];
+    // Draw short white fibres hanging from the tear
+    for(let t=0;t<3;t++){
+      const tx=prev.x+(pt.x-prev.x)*rnd();
+      const ty=prev.y+(pt.y-prev.y)*rnd();
+      const fl2=4+rnd()*14;
+      const fa2=(rnd()-.3)*.4+Math.PI*.5; // mostly downward
+      gc.strokeStyle=`rgba(255,252,240,${0.4+rnd()*.4})`;
+      gc.lineWidth=.5+rnd()*.8;
+      gc.beginPath();gc.moveTo(tx,ty);
+      gc.lineTo(tx+Math.cos(fa2)*fl2,ty+Math.sin(fa2)*fl2);gc.stroke();
+    }
+  });
 })();
 
 let paperDirty=true;
 function drawPaper(){
+  // Clear to transparent first — torn area above edge will show through
+  pctx.clearRect(0,0,PW,PH);
+
+  // ── Torn edge clipping path ───────────────────────────────────────
+  // Only draw paper BELOW the torn edge
+  pctx.save();
+  pctx.beginPath();
+  pctx.moveTo(0,PH);
+  pctx.lineTo(PW,PH);
+  pctx.lineTo(PW,TORN_PTS[TORN_PTS.length-1].y);
+  TORN_PTS.slice().reverse().forEach(pt=>pctx.lineTo(pt.x,pt.y));
+  pctx.closePath();
+  pctx.clip();
+
+  // Draw aged grain base
   pctx.drawImage(grainCv,0,0);
-  // Roller shadow at top
-  const sh=PH*.07,sg=pctx.createLinearGradient(0,0,0,sh);
-  sg.addColorStop(0,"rgba(35,22,12,0.30)");sg.addColorStop(.45,"rgba(35,22,12,0.10)");sg.addColorStop(1,"rgba(35,22,12,0)");
-  pctx.fillStyle=sg;pctx.fillRect(0,0,PW,sh);
+
+  // Torn edge shadow — dark line just below the tear for depth
+  pctx.save();
+  pctx.shadowColor="rgba(20,10,0,0.55)";
+  pctx.shadowBlur=10;
+  pctx.shadowOffsetY=4;
+  pctx.beginPath();
+  TORN_PTS.forEach((pt,i)=>i===0?pctx.moveTo(pt.x,pt.y):pctx.lineTo(pt.x,pt.y));
+  pctx.strokeStyle="rgba(200,175,120,0.9)"; // exposed fibre colour at tear
+  pctx.lineWidth=1.5;
+  pctx.stroke();
+  pctx.restore();
+
+  // Age vignette — darker yellowed edges
+  const vg=pctx.createRadialGradient(PW/2,PH/2,PH*.2,PW/2,PH/2,PH*.75);
+  vg.addColorStop(0,"rgba(0,0,0,0)");
+  vg.addColorStop(1,"rgba(40,20,0,0.18)");
+  pctx.fillStyle=vg;pctx.fillRect(0,0,PW,PH);
+
   // Side vignette
-  const lv=pctx.createLinearGradient(0,0,55,0);lv.addColorStop(0,"rgba(28,18,8,0.09)");lv.addColorStop(1,"rgba(28,18,8,0)");pctx.fillStyle=lv;pctx.fillRect(0,0,55,PH);
-  const rv=pctx.createLinearGradient(PW,0,PW-55,0);rv.addColorStop(0,"rgba(28,18,8,0.09)");rv.addColorStop(1,"rgba(28,18,8,0)");pctx.fillStyle=rv;pctx.fillRect(PW-55,0,55,PH);
+  const lv=pctx.createLinearGradient(0,0,60,0);lv.addColorStop(0,"rgba(28,18,4,0.12)");lv.addColorStop(1,"rgba(28,18,4,0)");pctx.fillStyle=lv;pctx.fillRect(0,0,60,PH);
+  const rv=pctx.createLinearGradient(PW,0,PW-60,0);rv.addColorStop(0,"rgba(28,18,4,0.12)");rv.addColorStop(1,"rgba(28,18,4,0)");pctx.fillStyle=rv;pctx.fillRect(PW-60,0,60,PH);
+
+  pctx.restore(); // end clip
+
+  // ── Roller shadow — below the tear, paper exits the machine ──────
+  const sh=Math.max(...TORN_PTS.map(p=>p.y))+PH*.04;
+  const sg=pctx.createLinearGradient(0,0,0,sh);
+  sg.addColorStop(0,"rgba(35,22,8,0.28)");sg.addColorStop(.5,"rgba(35,22,8,0.10)");sg.addColorStop(1,"rgba(35,22,8,0)");
+  pctx.fillStyle=sg;pctx.fillRect(0,0,PW,sh);
+
   // Margin line
-  pctx.strokeStyle="rgba(175,55,45,0.17)";pctx.lineWidth=1.4;pctx.beginPath();pctx.moveTo(MX-20,0);pctx.lineTo(MX-20,PH);pctx.stroke();
-  // Ruled lines
-  pctx.strokeStyle="rgba(145,132,108,0.09)";pctx.lineWidth=.8;
-  for(let i=0;i<ROWS+2;i++){const y=MY+(i+1)*LH-6;pctx.beginPath();pctx.moveTo(0,y);pctx.lineTo(PW,y);pctx.stroke();}
+  pctx.strokeStyle="rgba(160,50,35,0.16)";pctx.lineWidth=1.4;
+  pctx.beginPath();pctx.moveTo(MX-20,0);pctx.lineTo(MX-20,PH);pctx.stroke();
+
+  // Ruled lines (faint)
+  pctx.strokeStyle="rgba(130,115,80,0.10)";pctx.lineWidth=.8;
+  for(let i=0;i<ROWS+2;i++){
+    const y=MY+(i+1)*LH-6;
+    if(y<Math.max(...TORN_PTS.map(p=>p.y))+10)continue; // skip lines above tear
+    pctx.beginPath();pctx.moveTo(0,y);pctx.lineTo(PW,y);pctx.stroke();
+  }
+
   // Text
   pctx.font=`${FS}px 'Courier New',Courier,monospace`;pctx.textBaseline="top";
   for(let r=0;r<lines.length;r++){
@@ -167,6 +268,7 @@ function drawPaper(){
       pctx.restore();
     }
   }
+
   ptex.needsUpdate=true;paperDirty=false;
 }
 
@@ -394,7 +496,17 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
     if(!ch.isMesh)return;
     ch.castShadow=ch.receiveShadow=true;
     const arr=Array.isArray(ch.material)?ch.material:[ch.material];
-    ch.material=arr.map(o=>{const nm=pinkMat(o&&o.name);nm.map=null;if(o&&o.normalMap){nm.normalMap=o.normalMap;nm.normalScale.set(.6,.6);}return nm;});
+    ch.material=arr.map(o=>{
+      const nm=pinkMat(o&&o.name);
+      // Keep the baked label texture on key cap materials
+      if(o&&o.name&&o.name.startsWith('KeyMat_')){
+        nm.map=o.map; // preserve the letter texture
+      } else {
+        nm.map=null;  // strip baked colour from everything else
+      }
+      if(o&&o.normalMap){nm.normalMap=o.normalMap;nm.normalScale.set(.6,.6);}
+      return nm;
+    });
     if(ch.material.length===1)ch.material=ch.material[0];
     const n=(ch.name||"").toLowerCase();
     if(n.includes("tape")||n.includes("ribbon"))ribbonMeshes.push(ch);
@@ -457,7 +569,7 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
   }
   pos.needsUpdate=true;geo.computeVertexNormals();
 
-  const mat=new T.MeshStandardMaterial({map:ptex,roughness:1.0,metalness:0,envMap:env,envMapIntensity:.04,side:T.DoubleSide,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4});
+  const mat=new T.MeshStandardMaterial({map:ptex,roughness:1.0,metalness:0,envMap:env,envMapIntensity:.04,side:T.DoubleSide,transparent:true,alphaTest:0.05,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4});
   paperMesh=new T.Mesh(geo,mat);
   paperMesh.castShadow=true;
   paperMesh.renderOrder=1; // draw after platen to win depth test
@@ -529,7 +641,7 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
   const signMesh=new T.Mesh(signGeo,signMat);
   signMesh.renderOrder=2;
   // Position: front face of model (box.max.z), lower half (c.y - s.y*0.14)
-  signMesh.position.set(c.x, c.y-s.y*0.14, box.max.z+0.01);
+  signMesh.position.set(c.x, c.y+s.y*0.08, box.max.z+0.01);
   scene.add(signMesh);
 
 
