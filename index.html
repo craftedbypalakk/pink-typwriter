@@ -626,9 +626,7 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
     if(_labelTex[label]) return _labelTex[label];
     const kc=document.createElement('canvas');kc.width=kc.height=256;
     const kx=kc.getContext('2d');
-    // Ivory background
     kx.fillStyle='#F2EADE';kx.fillRect(0,0,256,256);
-    // Dark ink letter
     const fs=label.length===1?140:label.length===2?90:64;
     kx.font=`bold ${fs}px 'Courier New',Courier,monospace`;
     kx.fillStyle='rgba(18,12,20,0.92)';
