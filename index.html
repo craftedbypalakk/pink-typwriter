@@ -495,53 +495,41 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
   console.log("Keys:",Object.keys(keyMap).length);
 
   // ── CHAMPA SIGN — covers the "ROYAL" text on the body ─────
-  // Find the Logo/label mesh to get its exact world position
-  let logoWorldPos=null;
-  m.traverse(ch=>{
-    if(logoWorldPos) return;
-    const nn=(ch.name||'').toLowerCase();
-    if(nn.includes('logo')||nn.includes('label')){
-      const wp=new T.Vector3();
-      ch.getWorldPosition(wp);
-      logoWorldPos=wp;
-    }
-  });
+  // ROYAL sits below the gold label plate, in a recessed panel
+  // Find world position from model bounds — it's ~15% below center, at the front face
+  const signW=s.x*0.30;
+  const signH=signW*(128/512);
 
-  // Build canvas with CHAMPA in chrome/metal style matching the original
+  // Build canvas with CHAMPA in chrome style matching original ROYAL letters
   const sc=document.createElement('canvas');sc.width=512;sc.height=128;
   const sx=sc.getContext('2d');
-  // Transparent background — we only draw the text
   sx.clearRect(0,0,512,128);
-  // Chrome-style text — dark fill with a slight metallic gradient
+  // Pink body colour background to erase ROYAL underneath
+  sx.fillStyle='#d8467e'; // match body pink
+  sx.fillRect(0,0,512,128);
+  // Chrome gradient text
   const tg=sx.createLinearGradient(0,20,0,108);
-  tg.addColorStop(0,'#9a9aaa');
-  tg.addColorStop(0.3,'#e8e8f0');
-  tg.addColorStop(0.5,'#c8c8d8');
-  tg.addColorStop(0.7,'#f0f0f8');
-  tg.addColorStop(1,'#7a7a8a');
+  tg.addColorStop(0,'#888898');
+  tg.addColorStop(0.3,'#d8d8e8');
+  tg.addColorStop(0.5,'#b0b0c0');
+  tg.addColorStop(0.7,'#e8e8f4');
+  tg.addColorStop(1,'#686878');
   sx.fillStyle=tg;
-  sx.font='bold 82px "Arial Narrow",Arial,sans-serif';
+  sx.font='bold 76px "Arial Narrow",Arial,sans-serif';
   sx.textAlign='center';sx.textBaseline='middle';
-  sx.letterSpacing='12px';
-  // Slight emboss shadow
-  sx.shadowColor='rgba(0,0,0,0.5)';sx.shadowBlur=3;sx.shadowOffsetX=1;sx.shadowOffsetY=2;
+  sx.shadowColor='rgba(0,0,0,0.6)';sx.shadowBlur=2;sx.shadowOffsetX=1;sx.shadowOffsetY=2;
   sx.fillText('CHAMPA',256,64);
   const stex=new T.CanvasTexture(sc);stex.encoding=T.sRGBEncoding;
 
-  // Position the sign at the logo world position (or fallback to model front center)
-  const signPos=logoWorldPos||new T.Vector3(c.x,c.y-s.y*0.05,box.max.z+0.02);
-  // Width: match the approximate width of ROYAL sign on the model
-  const signW=s.x*0.28;
-  const signH=signW*(128/512);
   const signGeo=new T.PlaneGeometry(signW,signH);
   const signMat=new T.MeshStandardMaterial({
-    map:stex,transparent:true,alphaTest:0.05,
-    roughness:0.2,metalness:0.8,envMap:env,envMapIntensity:1.2,
-    depthWrite:false
+    map:stex,roughness:0.25,metalness:0.7,
+    envMap:env,envMapIntensity:1.0,depthWrite:true
   });
   const signMesh=new T.Mesh(signGeo,signMat);
-  // Place slightly in front of the body surface to avoid z-fighting
-  signMesh.position.set(signPos.x,signPos.y,signPos.z+0.015);
+  signMesh.renderOrder=2;
+  // Position: front face of model (box.max.z), lower half (c.y - s.y*0.14)
+  signMesh.position.set(c.x, c.y-s.y*0.14, box.max.z+0.01);
   scene.add(signMesh);
 
 
