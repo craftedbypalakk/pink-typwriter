@@ -591,14 +591,17 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
   paperGrp.userData.baseLocalY=paperBaseLocalY;
   carriageNode.add(paperGrp); // paper is bolted to carriage
 
-  // Key map — collected after matrixWorld update
+  // Key map — built from world positions, not just node names
+  // This is robust against naming corruption in the GLB
   const kp={};
+  const allKeyMeshes=[];
   m.traverse(ch=>{
     const nn=ch.name||"";
     if(!nn.startsWith("Key_"))return;
+    if(nn.includes("Extra"))return;
     let base=nn.replace(/_part\d+$/,"").replace(/_mesh$/,"");
     const code=base.replace("Key_","").trim();
-    if(code.includes("Extra"))return;
+    if(!code)return;
     if(!kp[code])kp[code]=[];
     kp[code].push(ch);
   });
@@ -607,14 +610,17 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
   });
   keysReady=true;
   console.log("Keys mapped:",Object.keys(keyMap).length);
-  // Debug: log world X position of each key to verify left/right
-  ['Tab','KeyQ','KeyW','KeyP','BracketRight'].forEach(code=>{
-    const parts=keyMap[code];
+  // Log ALL key world positions to verify mapping
+  const keyLog=[];
+  Object.entries(keyMap).forEach(([code,parts])=>{
     if(parts&&parts[0]){
       const wp=new T.Vector3();parts[0].getWorldPosition(wp);
-      console.log(`Key_${code}: worldX=${wp.x.toFixed(2)} (negative=left on screen)`);
+      keyLog.push({code,x:wp.x});
     }
   });
+  keyLog.sort((a,b)=>b.x-a.x); // desc X = screen left→right
+  console.log("Keys left→right on screen:");
+  keyLog.forEach(k=>console.log(`  ${k.code}: worldX=${k.x.toFixed(2)}`));
 
 
 
