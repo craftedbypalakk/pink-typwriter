@@ -249,7 +249,7 @@ const loaderEl = document.getElementById('loader');
 const pctEl = document.getElementById('loader-pct');
 
 new GLTFLoader().load(
-  'typewriter_rigged_clean.glb',
+  'typewriter_rigged_clean.glb?v=2',
   (gltf) => {
     const model = gltf.scene;
     model.traverse((obj) => {
@@ -319,12 +319,15 @@ new GLTFLoader().load(
    Key press animation
    ============================================================ */
 function pressKey(code) {
+  // This Royal has no 1 key — typists used lowercase L for the digit 1.
+  if (code === 'Digit1') code = 'KeyL';
   const parts = keyGroups[code];
   if (!parts) return false;
   activePresses.set(code, { phase: 'down', t: 0 });
   return true;
 }
 function releaseKey(code) {
+  if (code === 'Digit1') code = 'KeyL';
   const st = activePresses.get(code);
   if (st) st.phase = 'up';
 }
