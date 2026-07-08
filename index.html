@@ -11,22 +11,16 @@
   :root {
     --ink: #1c1a17;
     --paper: #f5f0e4;
-    --paper-shadow: #d9d2be;
     --room: #23262b;
     --brass: #a8874f;
-    --ribbon-red: #8c2f2f;
   }
-
   * { margin: 0; padding: 0; box-sizing: border-box; }
-
   html, body { height: 100%; overflow: hidden; }
-
   body {
     background: var(--room);
     font-family: 'Special Elite', 'Courier New', monospace;
     color: var(--paper);
   }
-
   #scene { position: fixed; inset: 0; display: block; }
 
   /* ---------- Loading ---------- */
@@ -40,7 +34,6 @@
   #loader .word {
     font-size: clamp(20px, 3.4vw, 34px);
     letter-spacing: .14em;
-    color: var(--paper);
   }
   #loader .word .caret {
     display: inline-block; width: .55em; height: 1.05em;
@@ -48,11 +41,9 @@
     animation: blink 1s steps(1) infinite;
   }
   @keyframes blink { 50% { opacity: 0; } }
-  #loader .pct {
-    font-size: 12px; letter-spacing: .3em; color: var(--brass);
-  }
+  #loader .pct { font-size: 12px; letter-spacing: .3em; color: var(--brass); }
 
-  /* ---------- Header ---------- */
+  /* ---------- Chrome ---------- */
   header {
     position: fixed; top: 0; left: 0; right: 0; z-index: 10;
     display: flex; align-items: baseline; justify-content: space-between;
@@ -60,100 +51,42 @@
   }
   header h1 {
     font-size: 15px; font-weight: 400; letter-spacing: .32em;
-    text-transform: uppercase; color: var(--paper); opacity: .85;
+    text-transform: uppercase; opacity: .85;
   }
   header .hint {
     font-family: 'Cormorant Garamond', serif; font-style: italic;
-    font-size: 15px; color: var(--paper); opacity: .55;
+    font-size: 15px; opacity: .55;
   }
+  #hud {
+    position: fixed; left: 28px; bottom: 22px; z-index: 10;
+    display: flex; flex-direction: column; gap: 8px;
+    font-size: 11px; letter-spacing: .22em;
+  }
+  #hud .row { display: flex; gap: 22px; align-items: center; }
+  #counter { opacity: .6; }
+  #hud button {
+    all: unset; cursor: pointer; letter-spacing: .22em;
+    font-family: inherit; font-size: 11px; opacity: .7; padding: 3px 0;
+  }
+  #hud button:hover, #hud button:focus-visible { color: var(--brass); opacity: 1; }
+  #orbit-hint { opacity: .4; pointer-events: none; }
 
-  /* ---------- The page (signature element) ---------- */
-  #page-wrap {
-    position: fixed; z-index: 10;
-    right: 26px; top: 74px; bottom: 26px;
-    width: min(400px, 42vw);
-    display: flex; flex-direction: column;
-    perspective: 900px;
+  /* End-of-page bell note */
+  #note {
+    position: fixed; right: 28px; bottom: 22px; z-index: 10;
+    font-family: 'Cormorant Garamond', serif; font-style: italic;
+    font-size: 15px; opacity: 0; transition: opacity .5s ease;
     pointer-events: none;
   }
-  #page {
-    pointer-events: auto;
-    flex: 1; overflow-y: auto;
-    background:
-      linear-gradient(90deg, rgba(140,47,47,.16) 0, rgba(140,47,47,.16) 2px, transparent 2px) 40px 0 / 100% 100% no-repeat,
-      repeating-linear-gradient(0deg, transparent 0 27px, rgba(28,26,23,.05) 27px 28px),
-      var(--paper);
-    color: var(--ink);
-    border-radius: 2px;
-    box-shadow:
-      0 1px 0 var(--paper-shadow) inset,
-      0 18px 40px rgba(0,0,0,.5),
-      0 2px 6px rgba(0,0,0,.35);
-    padding: 34px 30px 44px 52px;
-    font-size: 16px; line-height: 28px;
-    white-space: pre-wrap; word-break: break-word;
-    transform: rotateX(1.5deg);
-    scrollbar-width: thin;
-    scrollbar-color: var(--paper-shadow) transparent;
-  }
-  #page:focus-visible { outline: 3px solid var(--brass); outline-offset: 3px; }
-
-  #page .char { display: inline-block; }
-  #page .char.stamp { animation: stamp .09s ease-out; }
-  @keyframes stamp {
-    0% { transform: scale(1.35); opacity: .3; }
-    100% { transform: scale(1); opacity: 1; }
-  }
-  #page .caret {
-    display: inline-block; width: 9px; height: 18px;
-    background: var(--ink); opacity: .8; vertical-align: -3px;
-    animation: blink 1.1s steps(1) infinite;
-  }
-
-  #page-meta {
-    pointer-events: auto;
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 10px 4px 0;
-    font-size: 11px; letter-spacing: .22em; color: var(--paper); opacity: .6;
-  }
-  #page-meta button {
-    all: unset; cursor: pointer; letter-spacing: .22em;
-    font-family: inherit; font-size: 11px;
-    color: var(--paper); border-bottom: 1px solid transparent;
-  }
-  #page-meta button:hover, #page-meta button:focus-visible {
-    color: var(--brass); border-bottom-color: var(--brass);
-  }
-
-  /* ---------- Footer ---------- */
-  footer {
-    position: fixed; left: 28px; bottom: 22px; z-index: 10;
-    font-size: 11px; letter-spacing: .2em; color: var(--paper);
-    opacity: .45; pointer-events: none;
-  }
-
-  /* Sound toggle */
-  #sound {
-    position: fixed; left: 28px; bottom: 48px; z-index: 10;
-    all-unset: unset; background: none; border: none; cursor: pointer;
-    font-family: 'Special Elite', monospace; font-size: 11px;
-    letter-spacing: .22em; color: var(--paper); opacity: .65; padding: 4px 0;
-  }
-  #sound:hover, #sound:focus-visible { color: var(--brass); opacity: 1; }
+  #note.show { opacity: .7; }
 
   @media (max-width: 720px) {
     header { padding: 14px 16px; }
     header .hint { display: none; }
-    #page-wrap {
-      left: 12px; right: 12px; width: auto;
-      top: auto; bottom: 12px; height: 38vh;
-    }
-    footer, #sound { display: none; }
+    #orbit-hint { display: none; }
   }
-
   @media (prefers-reduced-motion: reduce) {
-    #page .char.stamp { animation: none; }
-    #page .caret, #loader .word .caret { animation: none; }
+    #loader .word .caret { animation: none; }
   }
 </style>
 </head>
@@ -166,21 +99,21 @@
 
 <header>
   <h1>Royal Typewriter</h1>
-  <span class="hint">Just start typing — the machine will follow.</span>
+  <span class="hint">Just start typing — it lands on the page.</span>
 </header>
 
-<canvas id="scene" aria-label="3D vintage Royal typewriter. Press keys on your keyboard to type."></canvas>
+<canvas id="scene" aria-label="3D vintage Royal typewriter. Type on your keyboard and the text appears on the paper in the machine."></canvas>
 
-<div id="page-wrap">
-  <div id="page" tabindex="0" aria-label="Typed page"></div>
-  <div id="page-meta">
+<div id="hud">
+  <div class="row">
     <span id="counter">LINE 1 · COL 0</span>
-    <button id="clear" type="button">New sheet</button>
+    <button id="newsheet" type="button">New sheet</button>
+    <button id="sound" type="button" aria-pressed="true">Sound on</button>
   </div>
+  <span id="orbit-hint">DRAG TO ORBIT · SCROLL TO ZOOM</span>
 </div>
 
-<button id="sound" type="button" aria-pressed="true">SOUND ON</button>
-<footer>DRAG TO ORBIT · SCROLL TO ZOOM</footer>
+<div id="note">ding — near the margin</div>
 
 <script type="importmap">
 {
@@ -214,15 +147,13 @@ scene.background = new THREE.Color(0x23262b);
 scene.fog = new THREE.Fog(0x23262b, 60, 160);
 
 const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 500);
-
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.06;
 controls.enablePan = false;
-controls.minPolarAngle = 0.55;
+controls.minPolarAngle = 0.5;
 controls.maxPolarAngle = 1.42;
 
-// Lighting: warm desk-lamp key, cool fill, soft rim
 scene.add(new THREE.AmbientLight(0xbfc4cc, 0.55));
 const keyLight = new THREE.DirectionalLight(0xfff1dd, 2.4);
 keyLight.position.set(18, 30, 22);
@@ -237,19 +168,41 @@ rim.position.set(0, 18, -28);
 scene.add(rim);
 
 /* ============================================================
-   Model
+   Paper typesetting constants
+   (derived from the GLB's paper mesh UV↔world fit)
    ============================================================ */
-const keyGroups = {};        // code -> [Object3D]
-const restPositions = new Map(); // Object3D -> THREE.Vector3
-const activePresses = new Map(); // code -> {t, releasing}
-let pressAxis = new THREE.Vector3(0, 0, -1); // refined after load
+const TEX = 512;                 // paper texture size
+const LINE_PX = 23;              // one carriage-return step, in texture px
+const STRIKE_ROW = 307;          // texture row of the strike line (v≈0.60)
+const COL0_PX = 96;              // first column, right of the red margin line
+const CHAR_PX = 10;              // 10-pitch type
+const MAX_COL = 38;              // hard right stop
+const BELL_COL = 33;             // margin bell
+const FEED_MAX = 2;              // mesh can physically rise this many lines
+                                 // (more and the sheet's bottom edge would clear the roller)
+// world movement of the paper mesh per line feed = d(world)/dv * (LINE_PX/TEX)
+const FEED_VEC = new THREE.Vector3(0.0033, 1.0157, 0.4244);
+
+/* ============================================================
+   Model + paper texture
+   ============================================================ */
+const keyGroups = {};
+const restPositions = new Map();
+const activePresses = new Map();
+let pressAxis = new THREE.Vector3(0, 0, -1);
 let pressDepth = 0.32;
+
+let paperMesh = null;
+let paperHome = null;
+let paperBase = null;        // pristine paper image
+let paperCanvas = null, pctx = null, lineCanvas = null, lctx = null;
+let paperTexture = null;
 
 const loaderEl = document.getElementById('loader');
 const pctEl = document.getElementById('loader-pct');
 
 new GLTFLoader().load(
-  'typewriter_rigged_clean.glb?v=2',
+  'typewriter_rigged_clean.glb?v=3',
   (gltf) => {
     const model = gltf.scene;
     model.traverse((obj) => {
@@ -259,28 +212,43 @@ new GLTFLoader().load(
         (keyGroups[m[1]] ??= []).push(obj);
         restPositions.set(obj, obj.position.clone());
       }
+      if (obj.isMesh && /Paper/.test(obj.name)) paperMesh = obj;
     });
     scene.add(model);
 
-    // Frame the machine like a desk shot
+    // --- Paper canvas: draw typed text into the paper's own texture ---
+    if (paperMesh) {
+      paperHome = paperMesh.position.clone();
+      paperBase = paperMesh.material.map.image;
+      paperCanvas = document.createElement('canvas');
+      paperCanvas.width = paperCanvas.height = TEX;
+      pctx = paperCanvas.getContext('2d');
+      lineCanvas = document.createElement('canvas');
+      lineCanvas.width = TEX; lineCanvas.height = LINE_PX + 8;
+      lctx = lineCanvas.getContext('2d');
+
+      paperTexture = new THREE.CanvasTexture(paperCanvas);
+      paperTexture.flipY = false;                       // match glTF convention
+      paperTexture.colorSpace = THREE.SRGBColorSpace;
+      paperTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      paperMesh.material.map = paperTexture;
+      redrawPaper();
+    }
+
+    // Frame the machine
     const box = new THREE.Box3().setFromObject(model);
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
     const radius = Math.max(size.x, size.y, size.z);
     controls.target.copy(center);
-    camera.position.set(
-      center.x - radius * 0.72,
-      center.y + radius * 0.55,
-      center.z + radius * 1.05
-    );
+    camera.position.set(center.x - radius * 0.55, center.y + radius * 0.62, center.z + radius * 1.0);
     camera.near = radius / 100;
     camera.far = radius * 20;
     camera.updateProjectionMatrix();
-    controls.minDistance = radius * 0.6;
+    controls.minDistance = radius * 0.55;
     controls.maxDistance = radius * 2.4;
     controls.update();
 
-    // Ground plane to catch the shadow
     const ground = new THREE.Mesh(
       new THREE.CircleGeometry(radius * 2.2, 48),
       new THREE.ShadowMaterial({ opacity: 0.35 })
@@ -290,24 +258,18 @@ new GLTFLoader().load(
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Derive press direction: convert world-down into the keys' parent
-    // local space, so keys always sink straight down on screen no matter
-    // how the model is oriented internally.
+    // Press direction: world-down converted to the keys' parent space
     const sample = keyGroups['KeyA']?.[0];
     if (sample && sample.parent) {
       sample.parent.updateWorldMatrix(true, false);
       const q = sample.parent.getWorldQuaternion(new THREE.Quaternion()).invert();
       pressAxis.set(0, -1, 0).applyQuaternion(q).normalize();
-      pressDepth = 0.32;
     }
 
     loaderEl.classList.add('hidden');
-    focusPage();
   },
   (xhr) => {
-    if (xhr.total) {
-      pctEl.textContent = `LOADING ${Math.round((xhr.loaded / xhr.total) * 100)}%`;
-    }
+    if (xhr.total) pctEl.textContent = `LOADING ${Math.round((xhr.loaded / xhr.total) * 100)}%`;
   },
   (err) => {
     pctEl.textContent = 'COULD NOT LOAD THE TYPEWRITER MODEL';
@@ -316,11 +278,109 @@ new GLTFLoader().load(
 );
 
 /* ============================================================
+   The page — text drawn onto the 3D paper
+   Real-typewriter rules: backspace moves back without erasing,
+   typing over an existing character overstrikes it.
+   ============================================================ */
+let lines = [[]];   // each line: array of stamps {col, ch, dx, dy, rot, ink}
+let col = 0;
+let lineIndex = 0;
+
+const counter = document.getElementById('counter');
+const note = document.getElementById('note');
+let noteTimer = null;
+
+function updateCounter() {
+  counter.textContent = `LINE ${lineIndex + 1} · COL ${col}`;
+}
+function flashNote(text) {
+  note.textContent = text;
+  note.classList.add('show');
+  clearTimeout(noteTimer);
+  noteTimer = setTimeout(() => note.classList.remove('show'), 1600);
+}
+
+// The paper texture is applied vertically flipped on the sheet, so each
+// line is rendered normally to a small canvas, then blitted flipped.
+function drawLineFlipped(stamps, rowCenter) {
+  lctx.clearRect(0, 0, lineCanvas.width, lineCanvas.height);
+  lctx.font = `15px 'Special Elite', 'Courier New', monospace`;
+  lctx.textBaseline = 'middle';
+  for (const s of stamps) {
+    lctx.fillStyle = `rgba(28, 26, 33, ${s.ink})`;
+    lctx.save();
+    lctx.translate(COL0_PX + s.col * CHAR_PX + s.dx, lineCanvas.height / 2 + s.dy);
+    lctx.rotate(s.rot);
+    lctx.fillText(s.ch, 0, 0);
+    lctx.restore();
+  }
+  pctx.save();
+  pctx.translate(0, rowCenter + lineCanvas.height / 2);
+  pctx.scale(1, -1);
+  pctx.drawImage(lineCanvas, 0, 0);
+  pctx.restore();
+}
+
+function redrawPaper() {
+  if (!pctx) return;
+  pctx.clearRect(0, 0, TEX, TEX);
+  pctx.drawImage(paperBase, 0, 0, TEX, TEX);
+  const feed = Math.min(lineIndex, FEED_MAX);
+  const scroll = lineIndex - feed;
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].length) continue;
+    const row = STRIKE_ROW - (i - scroll) * LINE_PX;
+    if (row < -LINE_PX || row > TEX + LINE_PX) continue;  // off the sheet
+    drawLineFlipped(lines[i], row);
+  }
+  paperTexture.needsUpdate = true;
+  // physical feed: paper mesh rises with the first few returns
+  if (paperMesh) {
+    paperMesh.position.copy(paperHome).addScaledVector(FEED_VEC, feed);
+  }
+}
+
+function typeChar(ch) {
+  if (col >= MAX_COL) { flashNote('carriage at the stop — return'); clack(0.15); return; }
+  const r = () => (Math.random() - 0.5);
+  lines[lineIndex].push({
+    col, ch,
+    dx: r() * 1.6, dy: r() * 1.4, rot: r() * 0.05,
+    ink: 0.62 + Math.random() * 0.3,
+  });
+  col++;
+  if (col === BELL_COL) { ding(); flashNote('ding — near the margin'); }
+  updateCounter();
+  redrawPaper();
+}
+function carriageReturnAction() {
+  lines.push([]);
+  lineIndex++;
+  col = 0;
+  carriageReturn();
+  updateCounter();
+  redrawPaper();
+}
+function backspaceAction() {
+  // A real typewriter backspace steps the carriage back — the ink stays.
+  if (col > 0) col--;
+  updateCounter();
+}
+function newSheet() {
+  lines = [[]];
+  lineIndex = 0;
+  col = 0;
+  carriageReturn();
+  updateCounter();
+  redrawPaper();
+}
+document.getElementById('newsheet').addEventListener('click', newSheet);
+
+/* ============================================================
    Key press animation
    ============================================================ */
 function pressKey(code) {
-  // This Royal has no 1 key — typists used lowercase L for the digit 1.
-  if (code === 'Digit1') code = 'KeyL';
+  if (code === 'Digit1') code = 'KeyL';   // Royals have no 1 — typists used L
   const parts = keyGroups[code];
   if (!parts) return false;
   activePresses.set(code, { phase: 'down', t: 0 });
@@ -335,19 +395,17 @@ function releaseKey(code) {
 const clock = new THREE.Clock();
 function animate() {
   const dt = Math.min(clock.getDelta(), 0.05);
-
   for (const [code, st] of activePresses) {
     const speed = st.phase === 'down' ? 14 : 8;
     st.t += (st.phase === 'down' ? 1 : -1) * speed * dt;
     st.t = Math.max(0, Math.min(1, st.t));
-    const ease = st.t * (2 - st.t); // ease-out
+    const ease = st.t * (2 - st.t);
     for (const obj of keyGroups[code]) {
       const rest = restPositions.get(obj);
       obj.position.copy(rest).addScaledVector(pressAxis, ease * pressDepth);
     }
     if (st.phase === 'up' && st.t === 0) activePresses.delete(code);
   }
-
   controls.update();
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
@@ -370,7 +428,7 @@ function ctx() {
   if (audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
 }
-function clack() {
+function clack(vol = 0.55) {
   if (!soundOn) return;
   const ac = ctx(), t = ac.currentTime;
   const buf = ac.createBuffer(1, ac.sampleRate * 0.05, ac.sampleRate);
@@ -380,7 +438,7 @@ function clack() {
   const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
   bp.frequency.value = 2200 + Math.random() * 900; bp.Q.value = 1.1;
   const g = ac.createGain();
-  g.gain.setValueAtTime(0.5 + Math.random() * 0.2, t);
+  g.gain.setValueAtTime(vol + Math.random() * 0.15, t);
   g.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
   src.connect(bp).connect(g).connect(ac.destination);
   src.start(t);
@@ -389,7 +447,7 @@ function ding() {
   if (!soundOn) return;
   const ac = ctx(), t = ac.currentTime;
   const o = ac.createOscillator(); o.type = 'sine';
-  o.frequency.setValueAtTime(2093, t); // C7 bell
+  o.frequency.setValueAtTime(2093, t);
   const g = ac.createGain();
   g.gain.setValueAtTime(0.25, t);
   g.gain.exponentialRampToValueAtTime(0.0005, t + 0.9);
@@ -410,78 +468,15 @@ function carriageReturn() {
   src.connect(lp).connect(g).connect(ac.destination);
   src.start(t);
 }
-
 const soundBtn = document.getElementById('sound');
 soundBtn.addEventListener('click', () => {
   soundOn = !soundOn;
-  soundBtn.textContent = soundOn ? 'SOUND ON' : 'SOUND OFF';
+  soundBtn.textContent = soundOn ? 'Sound on' : 'Sound off';
   soundBtn.setAttribute('aria-pressed', String(soundOn));
 });
 
 /* ============================================================
-   The page — typed text with typewriter imperfections
-   ============================================================ */
-const page = document.getElementById('page');
-const counter = document.getElementById('counter');
-const BELL_COL = 58;
-let col = 0, line = 1;
-
-const caret = document.createElement('span');
-caret.className = 'caret';
-page.appendChild(caret);
-
-function updateCounter() { counter.textContent = `LINE ${line} · COL ${col}`; }
-function focusPage() { page.focus({ preventScroll: true }); }
-
-function typeChar(ch) {
-  const span = document.createElement('span');
-  span.className = 'char stamp';
-  span.textContent = ch;
-  // Imperfect strike: tiny random tilt, offset, and ink weight
-  const r = (Math.random() - 0.5);
-  span.style.transform += ` rotate(${(r * 2.4).toFixed(2)}deg) translateY(${(r * 1.6).toFixed(2)}px)`;
-  span.style.opacity = (0.78 + Math.random() * 0.22).toFixed(2);
-  page.insertBefore(span, caret);
-  col++;
-  if (col === BELL_COL) ding();
-  updateCounter();
-  page.scrollTop = page.scrollHeight;
-}
-function newline() {
-  page.insertBefore(document.createTextNode('\n'), caret);
-  col = 0; line++;
-  carriageReturn();
-  updateCounter();
-  page.scrollTop = page.scrollHeight;
-}
-function backspace() {
-  const prev = caret.previousSibling;
-  if (!prev) return;
-  if (prev.nodeType === Node.TEXT_NODE && prev.textContent === '\n') {
-    line = Math.max(1, line - 1);
-    prev.remove();
-    // recount column on the now-current line
-    let c = 0, n = caret.previousSibling;
-    while (n && !(n.nodeType === Node.TEXT_NODE && n.textContent === '\n')) { c++; n = n.previousSibling; }
-    col = c;
-  } else {
-    prev.remove();
-    col = Math.max(0, col - 1);
-  }
-  updateCounter();
-}
-
-document.getElementById('clear').addEventListener('click', () => {
-  page.querySelectorAll('.char').forEach(el => el.remove());
-  [...page.childNodes].forEach(n => { if (n.nodeType === Node.TEXT_NODE) n.remove(); });
-  col = 0; line = 1;
-  carriageReturn();
-  updateCounter();
-  focusPage();
-});
-
-/* ============================================================
-   Keyboard wiring — KeyboardEvent.code matches node names 1:1
+   Keyboard wiring — codes match node names 1:1
    ============================================================ */
 window.addEventListener('keydown', (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -491,18 +486,17 @@ window.addEventListener('keydown', (e) => {
 
   if (e.key.length === 1) {
     e.preventDefault();
-    typeChar(e.key === ' ' ? '\u00A0' : e.key);
-    clack();
+    typeChar(e.key);
+    if (col <= MAX_COL) clack();
   } else if (e.code === 'Enter') {
     e.preventDefault();
-    newline();
+    carriageReturnAction();
   } else if (e.code === 'Backspace') {
     e.preventDefault();
-    backspace();
-    clack();
-  } else if (handledKey) {
-    // Shift / CapsLock / Tab — animate only
-    if (e.code === 'Tab') e.preventDefault();
+    backspaceAction();
+    clack(0.3);
+  } else if (handledKey && e.code === 'Tab') {
+    e.preventDefault();
   }
 });
 window.addEventListener('keyup', (e) => releaseKey(e.code));
@@ -518,7 +512,7 @@ canvas.addEventListener('pointerup', (e) => {
   if (!downAt) return;
   const moved = Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]);
   downAt = null;
-  if (moved > 6) return; // it was an orbit drag
+  if (moved > 6) return;
   pointer.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
   raycaster.setFromCamera(pointer, camera);
   const hits = raycaster.intersectObjects(scene.children, true);
@@ -528,10 +522,8 @@ canvas.addEventListener('pointerup', (e) => {
       const code = m[1];
       pressKey(code);
       setTimeout(() => releaseKey(code), 130);
-      // Mirror the strike onto the page
-      const map = { Space: '\u00A0', Comma: ',', Period: '.', Slash: '/', Semicolon: ';', Quote: "'", BracketLeft: '[', BracketRight: ']', Minus: '-', Backquote: '`' };
-      if (code === 'Enter') newline();
-      else if (code === 'Backspace') { backspace(); clack(); }
+      const map = { Space: ' ', Comma: ',', Period: '.', Slash: '/', Semicolon: ';', Quote: "'", Minus: '-', Equal: '=' };
+      if (code === 'Backspace') { backspaceAction(); clack(0.3); }
       else if (/^Key([A-Z])$/.test(code)) { typeChar(code.slice(3).toLowerCase()); clack(); }
       else if (/^Digit(\d)$/.test(code)) { typeChar(code.slice(5)); clack(); }
       else if (map[code] !== undefined) { typeChar(map[code]); clack(); }
