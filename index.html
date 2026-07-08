@@ -290,13 +290,15 @@ new GLTFLoader().load(
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Derive press direction: keys sit above the body, so press
-    // along the keys' local "up" (largest translation axis spread), negated.
-    // In this model the key nodes' parent space has +z as up.
+    // Derive press direction: convert world-down into the keys' parent
+    // local space, so keys always sink straight down on screen no matter
+    // how the model is oriented internally.
     const sample = keyGroups['KeyA']?.[0];
-    if (sample) {
+    if (sample && sample.parent) {
+      sample.parent.updateWorldMatrix(true, false);
+      const q = sample.parent.getWorldQuaternion(new THREE.Quaternion()).invert();
+      pressAxis.set(0, -1, 0).applyQuaternion(q).normalize();
       pressDepth = 0.32;
-      pressAxis.set(0, 0, -1); // parent-space down
     }
 
     loaderEl.classList.add('hidden');
