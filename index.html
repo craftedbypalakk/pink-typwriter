@@ -341,11 +341,8 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
     ch.material=arr.map(o=>{
       const matName=o&&o.name||"";
       const n=matName.toLowerCase();
-      // Debug first key material
-      if(ch.name&&ch.name.startsWith('Key_')&&!window._keyMatLogged){window._keyMatLogged=true;console.log('Key mat name:',matName,'has map:',!!(o&&o.map));}
 
       // KeyMat_ — baked key label texture, preserve exactly as-is
-      // Check both material name and mesh/node name
       if(matName.startsWith('KeyMat_') || (ch.name&&ch.name.startsWith('Key_')&&o&&o.map)){
         const km=new T.MeshStandardMaterial({
           map:o.map,roughness:.30,metalness:.04,
@@ -439,7 +436,6 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
     objs.forEach(o=>o.userData.origZ=o.position.z);
   });
   keysReady=true;
-  console.log("Keys mapped:",Object.keys(keyMap).length);
 
   // Shadow + blobs
   sf.position.y=box.min.y;
