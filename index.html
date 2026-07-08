@@ -333,29 +333,42 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
   setP(90);
   const m=g.scene;
 
-  // Apply materials — preserve KeyMat_ textures, pink everything else
+  // Apply materials — preserve original textures where they exist
   m.traverse(ch=>{
     if(!ch.isMesh)return;
     ch.castShadow=ch.receiveShadow=true;
     const arr=Array.isArray(ch.material)?ch.material:[ch.material];
     ch.material=arr.map(o=>{
       const matName=o&&o.name||"";
-      const nm=pinkMat(matName);
-      if(nm===null){
-        // KeyMat_ — preserve the baked texture
+      const n=matName.toLowerCase();
+
+      // KeyMat_ — baked key label texture, preserve exactly as-is
+      if(matName.startsWith('KeyMat_')){
         const km=new T.MeshStandardMaterial({
           map:o.map,roughness:.30,metalness:.04,
           envMap:env,envMapIntensity:.45
         });
         return km;
       }
+
+      // Paper — preserve original paper texture
+      if(n.includes("paper")){
+        const pm=new T.MeshStandardMaterial({
+          map:o.map,roughness:.92,metalness:0,
+          envMap:env,envMapIntensity:.1,side:T.DoubleSide
+        });
+        return pm;
+      }
+
+      // Everything else — apply pink materials
+      const nm=pinkMat(matName);
       nm.map=null;
       if(o&&o.normalMap){nm.normalMap=o.normalMap;nm.normalScale.set(.6,.6);}
       return nm;
     });
     if(ch.material.length===1)ch.material=ch.material[0];
-    const n=(ch.name||"").toLowerCase();
-    if(n.includes("tape")||n.includes("ribbon"))ribbonMeshes.push(ch);
+    const nn=(ch.name||"").toLowerCase();
+    if(nn.includes("tape")||nn.includes("ribbon"))ribbonMeshes.push(ch);
   });
 
   // Scale + center
