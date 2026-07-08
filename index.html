@@ -197,18 +197,17 @@ scene.add(rim);
 /* ============================================================
    Paper typesetting constants (from the paper mesh UV↔world fit)
    ============================================================ */
-const TEX = 512;
-const LINE_PX = 23;
-const STRIKE_ROW = 307;          // fixed strike line at the platen (v≈0.60)
-const TOP_ROW = 468;             // line 1, near the sheet's top edge
-const PHASE_A = Math.round((TOP_ROW - STRIKE_ROW) / LINE_PX); // 7 lines top→platen
-const PAGE_LINES = PHASE_A * 2;  // the half sheet holds two passes, then it ejects
+const TEXW = 512, TEXH = 1024;   // canvas covers the extended (taller) sheet
+const LINE_PX = 29.295;          // one carriage-return step
+const STRIKE_ROW = 391.28;       // fixed strike line at the platen
+const BASE_H = 652.14;           // height of one full page image on the canvas
+const EDGE0 = STRIKE_ROW + 1.6 * LINE_PX;  // fresh page: top edge just above the strike
+const PAGE_LINES = 14;           // lines per sheet, then it ejects
 const COL0_PX = 96;
 const CHAR_PX = 10;
 const MAX_COL = 38;
 const BELL_COL = 33;
-const RISE_PER_LINE = 0.12;      // subtle physical rise during phase A
-const FEED_VEC = new THREE.Vector3(0.0033, 1.0157, 0.4244); // world per line step
+const FEED_VEC = new THREE.Vector3(0.0033, 1.0157, 0.4244); // world per line step (used by eject)
 const EJECT_STEPS = 9;           // how far the sheet flies when ejected
 
 /* ============================================================
@@ -228,7 +227,7 @@ const loaderEl = document.getElementById('loader');
 const pctEl = document.getElementById('loader-pct');
 
 new GLTFLoader().load(
-  'typewriter_rigged_clean.glb?v=3',
+  'typewriter_rigged_clean.glb?v=4',
   (gltf) => {
     const model = gltf.scene;
     model.traverse((obj) => {
@@ -246,10 +245,10 @@ new GLTFLoader().load(
       paperHome = paperMesh.position.clone();
       paperBase = paperMesh.material.map.image;
       paperCanvas = document.createElement('canvas');
-      paperCanvas.width = paperCanvas.height = TEX;
+      paperCanvas.width = TEXW; paperCanvas.height = TEXH;
       pctx = paperCanvas.getContext('2d');
       lineCanvas = document.createElement('canvas');
-      lineCanvas.width = TEX; lineCanvas.height = LINE_PX + 8;
+      lineCanvas.width = TEXW; lineCanvas.height = Math.ceil(LINE_PX) + 8;
       lctx = lineCanvas.getContext('2d');
 
       paperTexture = new THREE.CanvasTexture(paperCanvas);
@@ -329,7 +328,7 @@ function flashNote(text) {
 /* ---------- drawing onto the 3D paper ---------- */
 function drawLineFlipped(stamps, rowCenter) {
   lctx.clearRect(0, 0, lineCanvas.width, lineCanvas.height);
-  lctx.font = `15px 'Special Elite', 'Courier New', monospace`;
+  lctx.font = `17px 'Special Elite', 'Courier New', monospace`;
   lctx.textBaseline = 'middle';
   for (const s of stamps) {
     lctx.fillStyle = `rgba(28, 26, 33, ${s.ink})`;
@@ -348,25 +347,20 @@ function drawLineFlipped(stamps, rowCenter) {
 
 function redrawPaper() {
   if (!pctx) return;
-  const a = Math.min(lineIndex, PHASE_A);
-  const b = lineIndex - a;
-  const baseOff = (b * LINE_PX) % TEX;
-
-  pctx.clearRect(0, 0, TEX, TEX);
-  pctx.drawImage(paperBase, 0, baseOff, TEX, TEX);
-  pctx.drawImage(paperBase, 0, baseOff - TEX, TEX, TEX);
+  // The page's visible top edge is painted: everything above it is
+  // transparent, so as the edge row climbs, the sheet truly rises out
+  // of the platen — edge, ruling, holes and text all together.
+  const pageTop = EDGE0 + lineIndex * LINE_PX;
+  pctx.clearRect(0, 0, TEXW, TEXH);
+  pctx.drawImage(paperBase, 0, pageTop - BASE_H, TEXW, BASE_H);
 
   for (let i = 0; i < lines.length; i++) {
     if (!lines[i].length) continue;
-    const row = TOP_ROW - i * LINE_PX + b * LINE_PX;
-    if (row < -LINE_PX || row > TEX + LINE_PX) continue;
+    const row = STRIKE_ROW + (lineIndex - i) * LINE_PX;
+    if (row < -LINE_PX || row > TEXH + LINE_PX) continue;
     drawLineFlipped(lines[i], row);
   }
   paperTexture.needsUpdate = true;
-
-  if (paperMesh && !ejecting) {
-    paperMesh.position.copy(paperHome).addScaledVector(FEED_VEC, a * RISE_PER_LINE);
-  }
 }
 
 /* ---------- typing actions ---------- */
@@ -416,12 +410,12 @@ let ejectAnim = null;   // { t, phase }
 function renderFinishedPage() {
   // A full, upright rendering of the sheet for the on-screen pile.
   const c = document.createElement('canvas');
-  c.width = TEX; c.height = TEX;
+  c.width = TEXW; c.height = Math.round(BASE_H);
   const g = c.getContext('2d');
-  g.drawImage(paperBase, 0, 0, TEX, TEX);
-  g.font = `15px 'Special Elite', 'Courier New', monospace`;
+  g.drawImage(paperBase, 0, 0, TEXW, BASE_H);
+  g.font = `17px 'Special Elite', 'Courier New', monospace`;
   g.textBaseline = 'middle';
-  const top = 46;
+  const top = 1.6 * LINE_PX;
   for (let i = 0; i < lines.length; i++) {
     for (const s of lines[i]) {
       g.fillStyle = `rgba(28, 26, 33, ${s.ink})`;
