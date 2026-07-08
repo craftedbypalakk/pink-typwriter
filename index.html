@@ -337,13 +337,13 @@ function carriageAdvance(){
   if(carriageCol>=RIGHT_MARGIN)return;
   carriageCol++;
   // carriageNode moves LEFT as column increases
-  carriageTargetX=-carriageCol*charWorldWidth;
+  carriageTargetX=carriageCol*charWorldWidth;
   if(carriageCol===BELL_COL)sndBell();
 }
 function carriageBackspace(){
   if(carriageCol<=0)return;
   carriageCol--;
-  carriageTargetX=-carriageCol*charWorldWidth;
+  carriageTargetX=carriageCol*charWorldWidth;
 }
 function carriageReturnSnap(){
   carriageCol=0;carriageTargetX=0;
@@ -390,7 +390,7 @@ function doBackspace(){
   } else if(curRow>0){
     curRow--;
     carriageCol=(lines[curRow]||[]).length;
-    carriageTargetX=-carriageCol*charWorldWidth;
+    carriageTargetX=carriageCol*charWorldWidth;
   }
 }
 
@@ -517,7 +517,8 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
   const c0=b0.getCenter(new T.Vector3());
   const s0=b0.getSize(new T.Vector3());
   const scl=4/Math.max(s0.x,s0.y,s0.z);
-  m.scale.setScalar(scl);m.position.set(-c0.x*scl,-c0.y*scl,-c0.z*scl);
+  m.scale.set(-scl,scl,scl); // negative X flips the model to face correctly
+  m.position.set(-c0.x*scl,-c0.y*scl,-c0.z*scl);
   scene.add(m);m.updateMatrixWorld(true);
   modelRoot=m;m.userData.baseX=m.position.x;m.userData.baseY=m.position.y;
 
@@ -604,66 +605,14 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
     keyMap[code]=objs;objs.forEach(o=>o.userData.origZ=o.position.z);
   });
   keysReady=true;
-  console.log("Keys:",Object.keys(keyMap).length);
-
-  // ── KEY LABELS — draw letter on each key cap ──────────────
-  const KEY_CHARS={
-    "KeyA":"A","KeyB":"B","KeyC":"C","KeyD":"D","KeyE":"E",
-    "KeyF":"F","KeyG":"G","KeyH":"H","KeyI":"I","KeyJ":"J",
-    "KeyK":"K","KeyL":"L","KeyM":"M","KeyN":"N","KeyO":"O",
-    "KeyP":"P","KeyQ":"Q","KeyR":"R","KeyS":"S","KeyT":"T",
-    "KeyU":"U","KeyV":"V","KeyW":"W","KeyX":"X","KeyY":"Y","KeyZ":"Z",
-    "Digit1":"1","Digit2":"2","Digit3":"3","Digit4":"4","Digit5":"5",
-    "Digit6":"6","Digit7":"7","Digit8":"8","Digit9":"9","Digit0":"0",
-    "Minus":"-","Semicolon":";","Quote":"'",
-    "Comma":",","Period":".","Slash":"/",
-    "Tab":"TAB","CapsLock":"CAP","Backspace":"DEL",
-    "Enter":"RET","ShiftLeft":"SHF","ShiftRight":"SHF",
-  };
-
-  const _labelTex={}; // cache textures by label
-  function getLabelTex(label){
-    if(_labelTex[label]) return _labelTex[label];
-    const kc=document.createElement('canvas');kc.width=kc.height=256;
-    const kx=kc.getContext('2d');
-    kx.fillStyle='#F2EADE';kx.fillRect(0,0,256,256);
-    const fs=label.length===1?140:label.length===2?90:64;
-    kx.font=`bold ${fs}px 'Courier New',Courier,monospace`;
-    kx.fillStyle='rgba(18,12,20,0.92)';
-    kx.textAlign='center';kx.textBaseline='middle';
-    kx.fillText(label,128,128);
-    const t=new T.CanvasTexture(kc);
-    t.encoding=T.sRGBEncoding;
-    _labelTex[label]=t;
-    return t;
-  }
-
-  Object.entries(KEY_CHARS).forEach(([code,label])=>{
+  console.log("Keys mapped:",Object.keys(keyMap).length);
+  // Debug: log world X position of each key to verify left/right
+  ['Tab','KeyQ','KeyW','KeyP','BracketRight'].forEach(code=>{
     const parts=keyMap[code];
-    if(!parts||!parts.length) return;
-    const ktex=getLabelTex(label);
-    // Find the topmost part (highest world Y = top face of key cap)
-    let topPart=parts[0];
-    let topY=-Infinity;
-    parts.forEach(obj=>{
-      if(!obj.isMesh) return;
-      const wp=new T.Vector3();
-      obj.getWorldPosition(wp);
-      if(wp.y>topY){topY=wp.y;topPart=obj;}
-    });
-    // Apply ivory+label texture only to the top cap part
-    topPart.material=new T.MeshStandardMaterial({
-      map:ktex,roughness:.30,metalness:.04,
-      envMap:env,envMapIntensity:.45
-    });
-    // Keep remaining parts ivory (no label)
-    parts.forEach(obj=>{
-      if(obj===topPart||!obj.isMesh) return;
-      obj.material=new T.MeshStandardMaterial({
-        color:new T.Color(0xf2eade),roughness:.30,metalness:.04,
-        envMap:env,envMapIntensity:.45
-      });
-    });
+    if(parts&&parts[0]){
+      const wp=new T.Vector3();parts[0].getWorldPosition(wp);
+      console.log(`Key_${code}: worldX=${wp.x.toFixed(2)} (negative=left on screen)`);
+    }
   });
 
 
