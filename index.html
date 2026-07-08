@@ -31,10 +31,7 @@
     gap: 18px; transition: opacity .6s ease;
   }
   #loader.hidden { opacity: 0; pointer-events: none; }
-  #loader .word {
-    font-size: clamp(20px, 3.4vw, 34px);
-    letter-spacing: .14em;
-  }
+  #loader .word { font-size: clamp(20px, 3.4vw, 34px); letter-spacing: .14em; }
   #loader .word .caret {
     display: inline-block; width: .55em; height: 1.05em;
     background: var(--paper); vertical-align: -0.15em;
@@ -71,22 +68,49 @@
   #hud button:hover, #hud button:focus-visible { color: var(--brass); opacity: 1; }
   #orbit-hint { opacity: .4; pointer-events: none; }
 
-  /* End-of-page bell note */
   #note {
-    position: fixed; right: 28px; bottom: 22px; z-index: 10;
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: 28px; z-index: 10;
     font-family: 'Cormorant Garamond', serif; font-style: italic;
-    font-size: 15px; opacity: 0; transition: opacity .5s ease;
+    font-size: 16px; opacity: 0; transition: opacity .5s ease;
     pointer-events: none;
   }
-  #note.show { opacity: .7; }
+  #note.show { opacity: .75; }
+
+  /* ---------- Finished pages stack ---------- */
+  #stack {
+    position: fixed; right: 26px; top: 72px; z-index: 10;
+    width: min(250px, 26vw);
+    pointer-events: none;
+    perspective: 800px;
+  }
+  #stack .sheet {
+    position: absolute; top: 0; right: 0;
+    width: 100%;
+    border-radius: 2px;
+    box-shadow: 0 14px 34px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.35);
+    transition: transform .7s cubic-bezier(.22,1,.36,1), opacity .7s ease;
+    transform-origin: 50% 20%;
+  }
+  #stack .sheet.enter {
+    transform: translate(20vw, 30vh) rotate(14deg) scale(.4);
+    opacity: 0;
+  }
+  #stack-label {
+    position: fixed; right: 28px; top: 52px; z-index: 10;
+    font-size: 10px; letter-spacing: .28em; opacity: 0; transition: opacity .6s;
+  }
+  #stack-label.show { opacity: .55; }
 
   @media (max-width: 720px) {
     header { padding: 14px 16px; }
     header .hint { display: none; }
     #orbit-hint { display: none; }
+    #stack { width: 34vw; top: 56px; right: 12px; }
   }
   @media (prefers-reduced-motion: reduce) {
     #loader .word .caret { animation: none; }
+    #stack .sheet { transition: none; }
   }
 </style>
 </head>
@@ -102,18 +126,21 @@
   <span class="hint">Just start typing — it lands on the page.</span>
 </header>
 
-<canvas id="scene" aria-label="3D vintage Royal typewriter. Type on your keyboard and the text appears on the paper in the machine."></canvas>
+<canvas id="scene" aria-label="3D vintage Royal typewriter. Type on your keyboard and the text appears on the paper. Full pages eject and stack on screen."></canvas>
+
+<span id="stack-label">FINISHED PAGES</span>
+<div id="stack" aria-live="polite"></div>
 
 <div id="hud">
   <div class="row">
-    <span id="counter">LINE 1 · COL 0</span>
-    <button id="newsheet" type="button">New sheet</button>
+    <span id="counter">PAGE 1 · LINE 1 · COL 0</span>
+    <button id="newsheet" type="button">Pull sheet</button>
     <button id="sound" type="button" aria-pressed="true">Sound on</button>
   </div>
   <span id="orbit-hint">DRAG TO ORBIT · SCROLL TO ZOOM</span>
 </div>
 
-<div id="note">ding — near the margin</div>
+<div id="note"></div>
 
 <script type="importmap">
 {
@@ -168,22 +195,21 @@ rim.position.set(0, 18, -28);
 scene.add(rim);
 
 /* ============================================================
-   Paper typesetting constants
-   (derived from the GLB's paper mesh UV↔world fit)
+   Paper typesetting constants (from the paper mesh UV↔world fit)
    ============================================================ */
-const TEX = 512;                 // paper texture size
-const LINE_PX = 23;              // one carriage-return step, in texture px
-const STRIKE_ROW = 307;          // texture row of the strike line (v≈0.60)
-const COL0_PX = 96;              // first column, right of the red margin line
-const CHAR_PX = 10;              // 10-pitch type
-const MAX_COL = 38;              // hard right stop
-const BELL_COL = 33;             // margin bell
-const TOP_ROW = 468;             // texture row of line 1 (near the sheet's top edge)
-const PHASE_A = Math.round((TOP_ROW - STRIKE_ROW) / LINE_PX);  // lines until type reaches the platen
-const RISE_PER_LINE = 0.25;      // physical mesh rise per return during phase A
-                                 // (sheet starts at its authored position and only rises)
-// world movement of the paper mesh per line feed = d(world)/dv * (LINE_PX/TEX)
-const FEED_VEC = new THREE.Vector3(0.0033, 1.0157, 0.4244);
+const TEX = 512;
+const LINE_PX = 23;
+const STRIKE_ROW = 307;          // fixed strike line at the platen (v≈0.60)
+const TOP_ROW = 468;             // line 1, near the sheet's top edge
+const PHASE_A = Math.round((TOP_ROW - STRIKE_ROW) / LINE_PX); // 7 lines top→platen
+const PAGE_LINES = PHASE_A * 2;  // the half sheet holds two passes, then it ejects
+const COL0_PX = 96;
+const CHAR_PX = 10;
+const MAX_COL = 38;
+const BELL_COL = 33;
+const RISE_PER_LINE = 0.12;      // subtle physical rise during phase A
+const FEED_VEC = new THREE.Vector3(0.0033, 1.0157, 0.4244); // world per line step
+const EJECT_STEPS = 9;           // how far the sheet flies when ejected
 
 /* ============================================================
    Model + paper texture
@@ -194,9 +220,7 @@ const activePresses = new Map();
 let pressAxis = new THREE.Vector3(0, 0, -1);
 let pressDepth = 0.32;
 
-let paperMesh = null;
-let paperHome = null;
-let paperBase = null;        // pristine paper image
+let paperMesh = null, paperHome = null, paperBase = null;
 let paperCanvas = null, pctx = null, lineCanvas = null, lctx = null;
 let paperTexture = null;
 
@@ -218,7 +242,6 @@ new GLTFLoader().load(
     });
     scene.add(model);
 
-    // --- Paper canvas: draw typed text into the paper's own texture ---
     if (paperMesh) {
       paperHome = paperMesh.position.clone();
       paperBase = paperMesh.material.map.image;
@@ -230,14 +253,14 @@ new GLTFLoader().load(
       lctx = lineCanvas.getContext('2d');
 
       paperTexture = new THREE.CanvasTexture(paperCanvas);
-      paperTexture.flipY = false;                       // match glTF convention
+      paperTexture.flipY = false;
       paperTexture.colorSpace = THREE.SRGBColorSpace;
       paperTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
       paperMesh.material.map = paperTexture;
+      paperMesh.material.transparent = true;
       redrawPaper();
     }
 
-    // Frame the machine
     const box = new THREE.Box3().setFromObject(model);
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
@@ -260,7 +283,6 @@ new GLTFLoader().load(
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Press direction: world-down converted to the keys' parent space
     const sample = keyGroups['KeyA']?.[0];
     if (sample && sample.parent) {
       sample.parent.updateWorldMatrix(true, false);
@@ -280,30 +302,31 @@ new GLTFLoader().load(
 );
 
 /* ============================================================
-   The page — text drawn onto the 3D paper
-   Real-typewriter rules: backspace moves back without erasing,
-   typing over an existing character overstrikes it.
+   Page state — real-typewriter rules
+   (backspace steps back without erasing; overtype allowed)
    ============================================================ */
-let lines = [[]];   // each line: array of stamps {col, ch, dx, dy, rot, ink}
+let lines = [[]];
 let col = 0;
 let lineIndex = 0;
+let pageNumber = 1;
+let ejecting = false;
+const typeQueue = [];   // input buffered during the eject animation
 
 const counter = document.getElementById('counter');
 const note = document.getElementById('note');
 let noteTimer = null;
 
 function updateCounter() {
-  counter.textContent = `LINE ${lineIndex + 1} · COL ${col}`;
+  counter.textContent = `PAGE ${pageNumber} · LINE ${lineIndex + 1} · COL ${col}`;
 }
 function flashNote(text) {
   note.textContent = text;
   note.classList.add('show');
   clearTimeout(noteTimer);
-  noteTimer = setTimeout(() => note.classList.remove('show'), 1600);
+  noteTimer = setTimeout(() => note.classList.remove('show'), 1700);
 }
 
-// The paper texture is applied vertically flipped on the sheet, so each
-// line is rendered normally to a small canvas, then blitted flipped.
+/* ---------- drawing onto the 3D paper ---------- */
 function drawLineFlipped(stamps, rowCenter) {
   lctx.clearRect(0, 0, lineCanvas.width, lineCanvas.height);
   lctx.font = `15px 'Special Elite', 'Courier New', monospace`;
@@ -325,34 +348,34 @@ function drawLineFlipped(stamps, rowCenter) {
 
 function redrawPaper() {
   if (!pctx) return;
-  const a = Math.min(lineIndex, PHASE_A);   // lines spent descending from the top
-  const b = lineIndex - a;                  // lines fed past the platen (conveyor)
+  const a = Math.min(lineIndex, PHASE_A);
+  const b = lineIndex - a;
   const baseOff = (b * LINE_PX) % TEX;
 
   pctx.clearRect(0, 0, TEX, TEX);
-  // The ruling, margin line and punch holes travel with the paper:
   pctx.drawImage(paperBase, 0, baseOff, TEX, TEX);
   pctx.drawImage(paperBase, 0, baseOff - TEX, TEX, TEX);
 
   for (let i = 0; i < lines.length; i++) {
     if (!lines[i].length) continue;
     const row = TOP_ROW - i * LINE_PX + b * LINE_PX;
-    if (row < -LINE_PX || row > TEX + LINE_PX) continue;  // fed past the top
+    if (row < -LINE_PX || row > TEX + LINE_PX) continue;
     drawLineFlipped(lines[i], row);
   }
   paperTexture.needsUpdate = true;
 
-  // Physical feed: the sheet rests at its authored position and rises a
-  // little with every return until the type reaches the platen; after that
-  // the texture conveyor above carries the motion.
-  if (paperMesh) {
-    paperMesh.position.copy(paperHome)
-      .addScaledVector(FEED_VEC, a * RISE_PER_LINE);
+  if (paperMesh && !ejecting) {
+    paperMesh.position.copy(paperHome).addScaledVector(FEED_VEC, a * RISE_PER_LINE);
   }
 }
 
+/* ---------- typing actions ---------- */
 function typeChar(ch) {
-  if (col >= MAX_COL) carriageReturnAction();   // auto return at the margin
+  if (ejecting) { typeQueue.push({ t: 'char', ch }); return; }
+  if (col >= MAX_COL) {
+    carriageReturnAction();
+    if (ejecting) { typeQueue.push({ t: 'char', ch }); return; }
+  }
   const r = () => (Math.random() - 0.5);
   lines[lineIndex].push({
     col, ch,
@@ -365,6 +388,8 @@ function typeChar(ch) {
   redrawPaper();
 }
 function carriageReturnAction() {
+  if (ejecting) { typeQueue.push({ t: 'return' }); return; }
+  if (lineIndex + 1 >= PAGE_LINES) { ejectPage(); return; }
   lines.push([]);
   lineIndex++;
   col = 0;
@@ -373,19 +398,125 @@ function carriageReturnAction() {
   redrawPaper();
 }
 function backspaceAction() {
-  // A real typewriter backspace steps the carriage back — the ink stays.
-  if (col > 0) col--;
+  if (ejecting) return;
+  if (col > 0) col--;   // the ink stays — overtype to correct
   updateCounter();
 }
-function newSheet() {
+document.getElementById('newsheet').addEventListener('click', () => {
+  if (!ejecting) ejectPage();
+});
+
+/* ============================================================
+   Page eject → on-screen stack → fresh sheet
+   ============================================================ */
+const stackEl = document.getElementById('stack');
+const stackLabel = document.getElementById('stack-label');
+let ejectAnim = null;   // { t, phase }
+
+function renderFinishedPage() {
+  // A full, upright rendering of the sheet for the on-screen pile.
+  const c = document.createElement('canvas');
+  c.width = TEX; c.height = TEX;
+  const g = c.getContext('2d');
+  g.drawImage(paperBase, 0, 0, TEX, TEX);
+  g.font = `15px 'Special Elite', 'Courier New', monospace`;
+  g.textBaseline = 'middle';
+  const top = 46;
+  for (let i = 0; i < lines.length; i++) {
+    for (const s of lines[i]) {
+      g.fillStyle = `rgba(28, 26, 33, ${s.ink})`;
+      g.save();
+      g.translate(COL0_PX + s.col * CHAR_PX + s.dx, top + i * LINE_PX + s.dy);
+      g.rotate(s.rot);
+      g.fillText(s.ch, 0, 0);
+      g.restore();
+    }
+  }
+  return c.toDataURL('image/jpeg', 0.85);
+}
+
+function addToStack(dataUrl) {
+  const img = document.createElement('img');
+  img.className = 'sheet enter';
+  img.src = dataUrl;
+  img.alt = `Finished page ${pageNumber}`;
+  stackEl.appendChild(img);
+  stackLabel.classList.add('show');
+
+  // Restyle the pile: newest in front, older sheets tucked behind it.
+  const sheets = [...stackEl.children];
+  while (sheets.length > 6) { sheets.shift().remove(); }
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const n = stackEl.children.length;
+    [...stackEl.children].forEach((el, i) => {
+      const depth = n - 1 - i;            // 0 = newest
+      el.classList.remove('enter');
+      el.style.zIndex = String(100 - depth);
+      el.style.transform =
+        `translate(${-depth * 9}px, ${-depth * 7}px) rotate(${depth % 2 ? -2.4 : 1.8}deg) scale(${1 - depth * 0.045})`;
+      el.style.opacity = String(Math.max(0.35, 1 - depth * 0.16));
+    });
+  }));
+}
+
+function ejectPage() {
+  if (!paperMesh) return;
+  const hasInk = lines.some(l => l.length);
+  ejecting = true;
+  const snapshot = hasInk ? renderFinishedPage() : null;
+  ejectAnim = { t: 0, phase: 'out', snapshot };
+  ratchetZip();
+  flashNote(hasInk ? `page ${pageNumber} — out of the machine` : 'fresh sheet');
+}
+
+function finishEjectSwap() {
+  if (ejectAnim.snapshot) {
+    addToStack(ejectAnim.snapshot);
+    pageNumber++;
+  }
   lines = [[]];
   lineIndex = 0;
   col = 0;
-  carriageReturn();
+  redrawPaper();   // clean sheet texture
   updateCounter();
-  redrawPaper();
 }
-document.getElementById('newsheet').addEventListener('click', newSheet);
+
+function stepEject(dt) {
+  if (!ejectAnim) return;
+  ejectAnim.t += dt;
+  const A = ejectAnim;
+  if (A.phase === 'out') {
+    // sheet zips up and out of the platen, fading at the end
+    const k = Math.min(A.t / 0.65, 1);
+    const e = 1 - Math.pow(1 - k, 3);
+    paperMesh.position.copy(paperHome).addScaledVector(FEED_VEC, e * EJECT_STEPS);
+    paperMesh.material.opacity = 1 - Math.max(0, (k - 0.7) / 0.3);
+    if (k === 1) {
+      finishEjectSwap();
+      A.phase = 'in';
+      A.t = 0;
+      thunk();
+    }
+  } else if (A.phase === 'in') {
+    // fresh sheet rolls down into place from just above
+    const k = Math.min(A.t / 0.45, 1);
+    const e = 1 - Math.pow(1 - k, 2);
+    paperMesh.position.copy(paperHome).addScaledVector(FEED_VEC, (1 - e) * 2.2);
+    paperMesh.material.opacity = Math.min(1, k * 2.5);
+    if (k === 1) {
+      paperMesh.position.copy(paperHome);
+      paperMesh.material.opacity = 1;
+      ejectAnim = null;
+      ejecting = false;
+      // flush anything typed during the animation
+      while (typeQueue.length) {
+        const q = typeQueue.shift();
+        if (q.t === 'char') { typeChar(q.ch); clack(0.35); }
+        else carriageReturnAction();
+      }
+    }
+  }
+}
 
 /* ============================================================
    Key press animation
@@ -417,6 +548,7 @@ function animate() {
     }
     if (st.phase === 'up' && st.t === 0) activePresses.delete(code);
   }
+  stepEject(dt);
   controls.update();
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
@@ -478,6 +610,25 @@ function carriageReturn() {
   g.gain.linearRampToValueAtTime(0.0, t + 0.28);
   src.connect(lp).connect(g).connect(ac.destination);
   src.start(t);
+}
+function ratchetZip() {
+  if (!soundOn) return;
+  const ac = ctx();
+  for (let i = 0; i < 9; i++) {
+    setTimeout(() => clack(0.22), i * 45);
+  }
+}
+function thunk() {
+  if (!soundOn) return;
+  const ac = ctx(), t = ac.currentTime;
+  const o = ac.createOscillator(); o.type = 'sine';
+  o.frequency.setValueAtTime(140, t);
+  o.frequency.exponentialRampToValueAtTime(60, t + 0.12);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.4, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+  o.connect(g).connect(ac.destination);
+  o.start(t); o.stop(t + 0.18);
 }
 const soundBtn = document.getElementById('sound');
 soundBtn.addEventListener('click', () => {
