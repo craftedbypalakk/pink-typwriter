@@ -201,7 +201,8 @@ const TEXW = 512, TEXH = 1024;   // canvas covers the extended (taller) sheet
 const LINE_PX = 29.295;          // one carriage-return step
 const STRIKE_ROW = 391.28;       // fixed strike line at the platen
 const BASE_H = 652.14;           // height of one full page image on the canvas
-const EDGE0 = STRIKE_ROW + 1.6 * LINE_PX;  // fresh page: top edge just above the strike
+const EDGE_MARGIN = 4.5;         // blank lines between the page's top edge and line 1
+const EDGE0 = STRIKE_ROW + EDGE_MARGIN * LINE_PX;  // fresh page stands clear of the platen
 const PAGE_LINES = 14;           // lines per sheet, then it ejects
 const COL0_PX = 96;
 const CHAR_PX = 10;
@@ -415,7 +416,7 @@ function renderFinishedPage() {
   g.drawImage(paperBase, 0, 0, TEXW, BASE_H);
   g.font = `17px 'Special Elite', 'Courier New', monospace`;
   g.textBaseline = 'middle';
-  const top = 1.6 * LINE_PX;
+  const top = EDGE_MARGIN * LINE_PX;
   for (let i = 0; i < lines.length; i++) {
     for (const s of lines[i]) {
       g.fillStyle = `rgba(28, 26, 33, ${s.ink})`;
