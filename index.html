@@ -178,8 +178,12 @@ const COL0_PX = 96;              // first column, right of the red margin line
 const CHAR_PX = 10;              // 10-pitch type
 const MAX_COL = 38;              // hard right stop
 const BELL_COL = 33;             // margin bell
-const FEED_MAX = 2;              // mesh can physically rise this many lines
+const FEED_MAX = 2;              // extra rise after the start feed is used up
                                  // (more and the sheet's bottom edge would clear the roller)
+const START_FEED = 7;            // page starts rolled down: only its top shows,
+                                 // so line 1 lands at the top of the sheet
+const TOTAL_FEED = START_FEED + FEED_MAX;
+const ROW0 = STRIKE_ROW + START_FEED * LINE_PX;   // texture row of line 1
 // world movement of the paper mesh per line feed = d(world)/dv * (LINE_PX/TEX)
 const FEED_VEC = new THREE.Vector3(0.0033, 1.0157, 0.4244);
 
@@ -325,23 +329,24 @@ function redrawPaper() {
   if (!pctx) return;
   pctx.clearRect(0, 0, TEX, TEX);
   pctx.drawImage(paperBase, 0, 0, TEX, TEX);
-  const feed = Math.min(lineIndex, FEED_MAX);
+  const feed = Math.min(lineIndex, TOTAL_FEED);
   const scroll = lineIndex - feed;
   for (let i = 0; i < lines.length; i++) {
     if (!lines[i].length) continue;
-    const row = STRIKE_ROW - (i - scroll) * LINE_PX;
+    const row = ROW0 - (i - scroll) * LINE_PX;
     if (row < -LINE_PX || row > TEX + LINE_PX) continue;  // off the sheet
     drawLineFlipped(lines[i], row);
   }
   paperTexture.needsUpdate = true;
-  // physical feed: paper mesh rises with the first few returns
+  // Physical feed: page begins rolled down (only its top above the platen)
+  // and rises one step per line until the sheet bottom nears the roller.
   if (paperMesh) {
-    paperMesh.position.copy(paperHome).addScaledVector(FEED_VEC, feed);
+    paperMesh.position.copy(paperHome).addScaledVector(FEED_VEC, feed - START_FEED);
   }
 }
 
 function typeChar(ch) {
-  if (col >= MAX_COL) { flashNote('carriage at the stop — return'); clack(0.15); return; }
+  if (col >= MAX_COL) carriageReturnAction();   // auto return at the margin
   const r = () => (Math.random() - 0.5);
   lines[lineIndex].push({
     col, ch,
@@ -487,7 +492,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key.length === 1) {
     e.preventDefault();
     typeChar(e.key);
-    if (col <= MAX_COL) clack();
+    clack();
   } else if (e.code === 'Enter') {
     e.preventDefault();
     carriageReturnAction();
