@@ -591,22 +591,64 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
   paperGrp.userData.baseLocalY=paperBaseLocalY;
   carriageNode.add(paperGrp); // paper is bolted to carriage
 
-  // Key map — built from world positions, not just node names
-  // This is robust against naming corruption in the GLB
-  const kp={};
-  const allKeyMeshes=[];
+  // Build keyMap using WORLD POSITIONS to assign key codes
+  // This bypasses any Three.js name-mangling from duplicate node names
+  // Collect all Key_ meshes with their world positions
+  const allKeyObjs=[];
   m.traverse(ch=>{
     const nn=ch.name||"";
     if(!nn.startsWith("Key_"))return;
     if(nn.includes("Extra"))return;
-    let base=nn.replace(/_part\d+$/,"").replace(/_mesh$/,"");
-    const code=base.replace("Key_","").trim();
-    if(!code)return;
-    if(!kp[code])kp[code]=[];
-    kp[code].push(ch);
+    if(!ch.isMesh)return;
+    const wp=new T.Vector3();ch.getWorldPosition(wp);
+    allKeyObjs.push({ch,wx:wp.x,wy:wp.y,wz:wp.z,name:nn});
   });
-  Object.entries(kp).forEach(([code,objs])=>{
-    keyMap[code]=objs;objs.forEach(o=>o.userData.origZ=o.position.z);
+
+  // Cluster by world Y (rows), sort by world X desc (screen left→right since mirrored)
+  allKeyObjs.sort((a,b)=>a.wy-b.wy);
+  const wrows=[];
+  let wcur=[allKeyObjs[0]];
+  for(let i=1;i<allKeyObjs.length;i++){
+    if(Math.abs(allKeyObjs[i].wy-wcur[wcur.length-1].wy)<0.08) wcur.push(allKeyObjs[i]);
+    else{wrows.push(wcur);wcur=[allKeyObjs[i]];}
+  }
+  wrows.push(wcur);
+  // Sort each row by worldX descending (positive=left since model mirrored)
+  wrows.forEach(r=>r.sort((a,b)=>b.wx-a.wx));
+
+  console.log(`World-position rows: ${wrows.length}, sizes: ${wrows.map(r=>r.length).join(',')}`);
+
+  // Map codes to rows — same layout as physical keyboard
+  const WLAYOUT=[
+    ["Backspace"],
+    ["Tab","KeyQ","KeyW","KeyE","KeyR","KeyT","KeyY","KeyU","KeyI","KeyO","KeyP","BracketLeft","BracketRight"],
+    ["CapsLock","KeyA","KeyS","KeyD","KeyF","KeyG","KeyH","KeyJ","KeyK","KeyL","Semicolon","Quote","Enter"],
+    ["ShiftLeft","KeyZ","KeyX","KeyC","KeyV","KeyB","KeyN","KeyM","Comma","Period","Slash","ShiftRight"],
+    ["Backquote","Digit1","Digit2","Digit3","Digit4","Digit5","Digit6","Digit7","Digit8","Digit9","Digit0","Minus"],
+    ["Space"],
+  ];
+
+  // Build keyMap from world-position clusters
+  // Each key has 3 mesh parts — group them by proximity
+  wrows.forEach((row,ri)=>{
+    if(ri>=WLAYOUT.length)return;
+    const layoutRow=WLAYOUT[ri];
+    // Sub-cluster by X within row (each key=3 parts close together)
+    const cols=[];
+    let ccur=[row[0]];
+    for(let i=1;i<row.length;i++){
+      if(Math.abs(row[i].wx-ccur[ccur.length-1].wx)<0.04) ccur.push(row[i]);
+      else{cols.push(ccur);ccur=[row[i]];}
+    }
+    cols.push(ccur);
+    console.log(`Row ${ri}: ${cols.length} cols, layout has ${layoutRow.length}`);
+    cols.forEach((col,ci)=>{
+      if(ci>=layoutRow.length)return;
+      const code=layoutRow[ci];
+      const meshes=col.map(o=>o.ch);
+      keyMap[code]=meshes;
+      meshes.forEach(o=>o.userData.origZ=o.position.z);
+    });
   });
   keysReady=true;
   console.log("Keys mapped:",Object.keys(keyMap).length);
