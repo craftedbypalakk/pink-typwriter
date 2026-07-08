@@ -178,12 +178,10 @@ const COL0_PX = 96;              // first column, right of the red margin line
 const CHAR_PX = 10;              // 10-pitch type
 const MAX_COL = 38;              // hard right stop
 const BELL_COL = 33;             // margin bell
-const FEED_MAX = 2;              // extra rise after the start feed is used up
-                                 // (more and the sheet's bottom edge would clear the roller)
-const START_FEED = 7;            // page starts rolled down: only its top shows,
-                                 // so line 1 lands at the top of the sheet
-const TOTAL_FEED = START_FEED + FEED_MAX;
-const ROW0 = STRIKE_ROW + START_FEED * LINE_PX;   // texture row of line 1
+const TOP_ROW = 468;             // texture row of line 1 (near the sheet's top edge)
+const PHASE_A = Math.round((TOP_ROW - STRIKE_ROW) / LINE_PX);  // lines until type reaches the platen
+const RISE_PER_LINE = 0.3;       // physical mesh rise per return during phase A
+const START_DROP = PHASE_A * RISE_PER_LINE;  // page starts this much lower, rises back to home
 // world movement of the paper mesh per line feed = d(world)/dv * (LINE_PX/TEX)
 const FEED_VEC = new THREE.Vector3(0.0033, 1.0157, 0.4244);
 
@@ -327,21 +325,29 @@ function drawLineFlipped(stamps, rowCenter) {
 
 function redrawPaper() {
   if (!pctx) return;
+  const a = Math.min(lineIndex, PHASE_A);   // lines spent descending from the top
+  const b = lineIndex - a;                  // lines fed past the platen (conveyor)
+  const baseOff = (b * LINE_PX) % TEX;
+
   pctx.clearRect(0, 0, TEX, TEX);
-  pctx.drawImage(paperBase, 0, 0, TEX, TEX);
-  const feed = Math.min(lineIndex, TOTAL_FEED);
-  const scroll = lineIndex - feed;
+  // The ruling, margin line and punch holes travel with the paper:
+  pctx.drawImage(paperBase, 0, baseOff, TEX, TEX);
+  pctx.drawImage(paperBase, 0, baseOff - TEX, TEX, TEX);
+
   for (let i = 0; i < lines.length; i++) {
     if (!lines[i].length) continue;
-    const row = ROW0 - (i - scroll) * LINE_PX;
-    if (row < -LINE_PX || row > TEX + LINE_PX) continue;  // off the sheet
+    const row = TOP_ROW - i * LINE_PX + b * LINE_PX;
+    if (row < -LINE_PX || row > TEX + LINE_PX) continue;  // fed past the top
     drawLineFlipped(lines[i], row);
   }
   paperTexture.needsUpdate = true;
-  // Physical feed: page begins rolled down (only its top above the platen)
-  // and rises one step per line until the sheet bottom nears the roller.
+
+  // Physical feed: the sheet starts slightly low and rises a little with
+  // every return until the type reaches the platen; after that the texture
+  // conveyor above carries the motion (the mesh has no more safe travel).
   if (paperMesh) {
-    paperMesh.position.copy(paperHome).addScaledVector(FEED_VEC, feed - START_FEED);
+    paperMesh.position.copy(paperHome)
+      .addScaledVector(FEED_VEC, a * RISE_PER_LINE - START_DROP);
   }
 }
 
