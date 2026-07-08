@@ -343,7 +343,8 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
       const n=matName.toLowerCase();
 
       // KeyMat_ — baked key label texture, preserve exactly as-is
-      if(matName.startsWith('KeyMat_')){
+      // Check both material name and mesh/node name
+      if(matName.startsWith('KeyMat_') || (ch.name&&ch.name.startsWith('Key_')&&o.map)){
         const km=new T.MeshStandardMaterial({
           map:o.map,roughness:.30,metalness:.04,
           envMap:env,envMapIntensity:.45
