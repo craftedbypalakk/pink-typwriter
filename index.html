@@ -413,11 +413,6 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
   carriageNode.add(paperGrp);
 
   // ── KEY MAP ────────────────────────────────────────────────
-  // This GLB has clean Key_Code node names.
-  // Simply traverse and collect by node name.
-  // The GLB has nodes named Key_KeyA, Key_Space, Key_Enter etc.
-  // Positive local X = left on screen (model is mirrored).
-  // pressKey moves local Z by PRESS_DIST (-1.2) = world down = key goes down ✓
   m.updateMatrixWorld(true);
   const kp={};
   m.traverse(ch=>{
@@ -425,20 +420,23 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
     const nn=ch.name||"";
     if(!nn.startsWith("Key_"))return;
     if(nn.includes("Extra"))return;
-    // Strip _part suffix to get base code
-    const base=nn.replace(/_part\d+$/,"");
+    // Strip Three.js duplicate suffix (_1, _2) and _part suffix
+    // e.g. "Key_Space_1" → "Key_Space", "Key_Space_part2_1" → "Key_Space"
+    let base=nn
+      .replace(/_\d+$/,"")       // strip trailing _1, _2 etc
+      .replace(/_part\d+$/,"")   // strip _part1, _part2 etc
+      .replace(/_\d+$/,"");      // strip again in case: _part2_1
     const code=base.replace("Key_","").trim();
     if(!code)return;
     if(!kp[code])kp[code]=[];
     kp[code].push(ch);
   });
-  // Store origZ for each mesh
   Object.entries(kp).forEach(([code,objs])=>{
     keyMap[code]=objs;
     objs.forEach(o=>o.userData.origZ=o.position.z);
   });
   keysReady=true;
-  console.log("Keys mapped:",Object.keys(keyMap).length,Object.keys(keyMap).sort().join(" "));
+  console.log("Keys mapped:",Object.keys(keyMap).length);
 
   // Shadow + blobs
   sf.position.y=box.min.y;
