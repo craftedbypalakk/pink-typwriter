@@ -337,13 +337,13 @@ function carriageAdvance(){
   if(carriageCol>=RIGHT_MARGIN)return;
   carriageCol++;
   // carriageNode moves LEFT as column increases
-  carriageTargetX=carriageCol*charWorldWidth;
+  carriageTargetX=-carriageCol*charWorldWidth;
   if(carriageCol===BELL_COL)sndBell();
 }
 function carriageBackspace(){
   if(carriageCol<=0)return;
   carriageCol--;
-  carriageTargetX=carriageCol*charWorldWidth;
+  carriageTargetX=-carriageCol*charWorldWidth;
 }
 function carriageReturnSnap(){
   carriageCol=0;carriageTargetX=0;
@@ -390,7 +390,7 @@ function doBackspace(){
   } else if(curRow>0){
     curRow--;
     carriageCol=(lines[curRow]||[]).length;
-    carriageTargetX=carriageCol*charWorldWidth;
+    carriageTargetX=-carriageCol*charWorldWidth;
   }
 }
 
@@ -517,8 +517,7 @@ new T.GLTFLoader().load("typewriter_rigged.glb",g=>{
   const c0=b0.getCenter(new T.Vector3());
   const s0=b0.getSize(new T.Vector3());
   const scl=4/Math.max(s0.x,s0.y,s0.z);
-  m.scale.set(-scl,scl,scl); // negative X flips the model to face correctly
-  m.position.set(-c0.x*scl,-c0.y*scl,-c0.z*scl);
+  m.scale.setScalar(scl);m.position.set(-c0.x*scl,-c0.y*scl,-c0.z*scl);
   scene.add(m);m.updateMatrixWorld(true);
   modelRoot=m;m.userData.baseX=m.position.x;m.userData.baseY=m.position.y;
 
