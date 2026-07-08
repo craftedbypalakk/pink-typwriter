@@ -400,6 +400,8 @@ const PRESS_DIST=-1.2;
 function pressKey(code){
   if(!keysReady)return;
   const parts=keyMap[code];if(!parts)return;
+  const wp=new T.Vector3();parts[0].getWorldPosition(wp);
+  console.log(`PRESS Key_${code} worldX=${wp.x.toFixed(2)}`);
   parts.forEach(o=>{if(o.userData.origZ===undefined)o.userData.origZ=o.position.z;o.position.z=o.userData.origZ+PRESS_DIST;});
 }
 function releaseKey(code){
