@@ -137,7 +137,7 @@
     <button id="newsheet" type="button">Pull sheet</button>
     <button id="sound" type="button" aria-pressed="true">Sound on</button>
   </div>
-  <span id="orbit-hint">DRAG TO ORBIT · SCROLL TO ZOOM · BUILD 16</span>
+  <span id="orbit-hint">DRAG TO ORBIT · SCROLL TO ZOOM · BUILD 17</span>
 </div>
 
 <div id="note"></div>
@@ -589,11 +589,14 @@ function animate() {
   // sweeps back right on return; the painted guide rides the same spring
   // so the strike point stays fixed under the type guide, like the machine ---
   let moving = false;
-  const cd = col - carCol;
-  if (Math.abs(cd) > 0.01 || Math.abs(carV) > 0.05) {
-    carV += cd * 480 * dt;                // spring with momentum
-    carV *= Math.exp(-18 * dt);           // near-critical damping — just a whisper of overshoot
-    carCol += carV * dt;
+  // Critically damped approach: momentum and ease with zero bounce.
+  if (Math.abs(col - carCol) > 0.005 || Math.abs(carV) > 0.02) {
+    const omega = 15;
+    const ex = Math.exp(-omega * dt);
+    const change = carCol - col;
+    const temp = (carV + omega * change) * dt;
+    carCol = col + (change + temp) * ex;
+    carV = (carV - omega * temp) * ex;
     moving = true;
   } else { if (carCol !== col) moving = true; carCol = col; carV = 0; }
   if (!ejecting) {
