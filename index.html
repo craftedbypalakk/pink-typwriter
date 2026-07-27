@@ -137,7 +137,7 @@
     <button id="newsheet" type="button">Pull sheet</button>
     <button id="sound" type="button" aria-pressed="true">Sound on</button>
   </div>
-  <span id="orbit-hint">DRAG TO ORBIT · SCROLL TO ZOOM</span>
+  <span id="orbit-hint">DRAG TO ORBIT · SCROLL TO ZOOM · BUILD 9</span>
 </div>
 
 <div id="note"></div>
@@ -233,7 +233,7 @@ const loaderEl = document.getElementById('loader');
 const pctEl = document.getElementById('loader-pct');
 
 new GLTFLoader().load(
-  'typewriter_rigged_clean.glb?v=8',
+  'typewriter_rigged_clean.glb?v=9',
   (gltf) => {
     const model = gltf.scene;
     model.traverse((obj) => {
@@ -244,9 +244,12 @@ new GLTFLoader().load(
         restPositions.set(obj, obj.position.clone());
       }
       if (obj.isMesh && /Paper/.test(obj.name)) paperMesh = obj;
-      if (obj.isMesh && obj.name.startsWith('Carriage_')) carriageParts.push(obj);
+      if (obj.isMesh && obj.name.includes('Carriage')) carriageParts.push(obj);
     });
     for (const p of carriageParts) carriageHomes.set(p, p.position.clone());
+    console.log('[typewriter] carriage parts found:', carriageParts.length,
+                carriageParts.map(p => p.name));
+    if (!carriageParts.length) console.error('[typewriter] NO CARRIAGE PARTS — wrong GLB loaded?');
     scene.add(model);
 
     if (paperMesh) {
@@ -322,7 +325,6 @@ const typeQueue = [];   // input buffered during the eject animation
 // --- carriage motion state ---
 let carCol = 0;          // eased column: drives the real 3D carriage position
 let carV = 0;            // spring velocity, for a slight mechanical overshoot
-let guideX = COL0_PX + CHAR_PX / 2;  // painted guide, derived from carCol
 let riseFrac = 0;        // -1..0 during the line-feed sweep (page eases up)
 let stampT = 1;          // 0..1 ink-press animation of the newest strike
 let paperDirty = true;
@@ -392,14 +394,6 @@ function paintPaper() {
     drawLineFlipped(lines[i], row, i === lineIndex ? stampT : 1);
   }
 
-  // The type guide: a ribbon-red marker riding the strike line —
-  // an underline at the next cell plus a slim hairline.
-  if (!ejecting) {
-    pctx.fillStyle = 'rgba(140, 47, 47, 0.85)';
-    pctx.fillRect(guideX - CHAR_PX / 2, STRIKE_ROW - 12.5, CHAR_PX, 2.6);
-    pctx.fillStyle = 'rgba(140, 47, 47, 0.5)';
-    pctx.fillRect(guideX - 0.9, STRIKE_ROW - 10, 1.8, 17);
-  }
   pctx.restore();
   paperTexture.needsUpdate = true;
 }
@@ -598,7 +592,6 @@ function animate() {
     carCol += carV * dt;
     moving = true;
   } else { if (carCol !== col) moving = true; carCol = col; carV = 0; }
-  guideX = COL0_PX + (carCol + 0.5) * CHAR_PX;
   if (!ejecting) {
     const dx = -carCol * CHAR_WORLD;      // carriage travels left as the line fills
     for (const part of carriageParts) {
