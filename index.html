@@ -314,6 +314,12 @@ let pageNumber = 1;
 let ejecting = false;
 const typeQueue = [];   // input buffered during the eject animation
 
+// --- carriage motion state ---
+let guideX = COL0_PX;    // the type guide glides toward the next strike cell
+let riseFrac = 0;        // -1..0 during the line-feed sweep (page eases up)
+let stampT = 1;          // 0..1 ink-press animation of the newest strike
+let paperDirty = true;
+
 const counter = document.getElementById('counter');
 const note = document.getElementById('note');
 let noteTimer = null;
@@ -329,15 +335,20 @@ function flashNote(text) {
 }
 
 /* ---------- drawing onto the 3D paper ---------- */
-function drawLineFlipped(stamps, rowCenter) {
+function drawLineFlipped(stamps, rowCenter, newestT = 1) {
   lctx.clearRect(0, 0, lineCanvas.width, lineCanvas.height);
   lctx.font = `17px 'Special Elite', 'Courier New', monospace`;
   lctx.textBaseline = 'middle';
-  for (const s of stamps) {
-    lctx.fillStyle = `rgba(28, 26, 33, ${s.ink})`;
+  for (let k = 0; k < stamps.length; k++) {
+    const s = stamps[k];
+    const isNew = k === stamps.length - 1 && newestT < 1;
+    const press = isNew ? 1 + 0.5 * (1 - newestT) : 1;    // ink lands with a squash
+    const a = isNew ? s.ink * (0.35 + 0.65 * newestT) : s.ink;
+    lctx.fillStyle = `rgba(28, 26, 33, ${a})`;
     lctx.save();
     lctx.translate(COL0_PX + s.col * CHAR_PX + s.dx, lineCanvas.height / 2 + s.dy);
     lctx.rotate(s.rot);
+    lctx.scale(press, press);
     lctx.fillText(s.ch, 0, 0);
     lctx.restore();
   }
@@ -348,20 +359,30 @@ function drawLineFlipped(stamps, rowCenter) {
   pctx.restore();
 }
 
-function redrawPaper() {
+function redrawPaper() { paperDirty = true; }
+
+function paintPaper() {
   if (!pctx) return;
   // The page's visible top edge is painted: everything above it is
   // transparent, so as the edge row climbs, the sheet truly rises out
-  // of the platen — edge, ruling, holes and text all together.
-  const pageTop = EDGE0 + lineIndex * LINE_PX;
+  // of the platen — edge, holes and text all together. riseFrac eases
+  // -1 → 0 during a carriage return so the feed is a sweep, not a jump.
+  const li = lineIndex + riseFrac;
+  const pageTop = EDGE0 + li * LINE_PX;
   pctx.clearRect(0, 0, TEXW, TEXH);
   pctx.drawImage(paperBase, 0, pageTop - BASE_H, TEXW, BASE_H);
 
   for (let i = 0; i < lines.length; i++) {
     if (!lines[i].length) continue;
-    const row = STRIKE_ROW + (lineIndex - i) * LINE_PX;
+    const row = STRIKE_ROW + (li - i) * LINE_PX;
     if (row < -LINE_PX || row > TEXH + LINE_PX) continue;
-    drawLineFlipped(lines[i], row);
+    drawLineFlipped(lines[i], row, i === lineIndex ? stampT : 1);
+  }
+
+  // The type guide: a soft caret gliding along the strike line.
+  if (!ejecting) {
+    pctx.fillStyle = 'rgba(28, 26, 33, 0.32)';
+    pctx.fillRect(guideX - 1, STRIKE_ROW - 8, 2.5, 16);
   }
   paperTexture.needsUpdate = true;
 }
@@ -380,6 +401,7 @@ function typeChar(ch) {
     ink: 0.62 + Math.random() * 0.3,
   });
   col++;
+  stampT = 0;   // ink-press animation of the fresh strike
   if (col === BELL_COL) { ding(); flashNote('ding — near the margin'); }
   updateCounter();
   redrawPaper();
@@ -390,6 +412,7 @@ function carriageReturnAction() {
   lines.push([]);
   lineIndex++;
   col = 0;
+  riseFrac = -1;   // the page sweeps up into place instead of jumping
   carriageReturn();
   updateCounter();
   redrawPaper();
@@ -546,6 +569,18 @@ function animate() {
     if (st.phase === 'up' && st.t === 0) activePresses.delete(code);
   }
   stepEject(dt);
+
+  // --- carriage motion: guide glide, line-feed sweep, ink press ---
+  let moving = false;
+  const guideTarget = COL0_PX + col * CHAR_PX;
+  if (Math.abs(guideX - guideTarget) > 0.15) {
+    guideX += (guideTarget - guideX) * Math.min(1, dt * 16);
+    moving = true;
+  } else if (guideX !== guideTarget) { guideX = guideTarget; moving = true; }
+  if (riseFrac < 0) { riseFrac = Math.min(0, riseFrac + dt / 0.26); moving = true; }
+  if (stampT < 1) { stampT = Math.min(1, stampT + dt / 0.09); moving = true; }
+  if (moving || paperDirty) { paintPaper(); paperDirty = false; }
+
   controls.update();
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
