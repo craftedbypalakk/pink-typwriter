@@ -211,6 +211,7 @@ const CHAR_PX = 10;
 const MAX_COL = 38;
 const BELL_COL = 33;
 const FEED_VEC = new THREE.Vector3(0.0033, 1.0157, 0.4244); // world per line step (used by eject)
+const CHAR_WORLD = 0.41078;      // world distance the carriage travels per character
 const EJECT_STEPS = 9;           // how far the sheet flies when ejected
 
 /* ============================================================
@@ -223,6 +224,8 @@ let pressAxis = new THREE.Vector3(0, 0, -1);
 let pressDepth = 0.32;
 
 let paperMesh = null, paperHome = null, paperBase = null;
+const carriageParts = [];
+const carriageHomes = new Map();
 let paperCanvas = null, pctx = null, lineCanvas = null, lctx = null;
 let paperTexture = null;
 
@@ -230,7 +233,7 @@ const loaderEl = document.getElementById('loader');
 const pctEl = document.getElementById('loader-pct');
 
 new GLTFLoader().load(
-  'typewriter_rigged_clean.glb?v=7',
+  'typewriter_rigged_clean.glb?v=8',
   (gltf) => {
     const model = gltf.scene;
     model.traverse((obj) => {
@@ -241,7 +244,9 @@ new GLTFLoader().load(
         restPositions.set(obj, obj.position.clone());
       }
       if (obj.isMesh && /Paper/.test(obj.name)) paperMesh = obj;
+      if (obj.isMesh && obj.name.startsWith('Carriage_')) carriageParts.push(obj);
     });
+    for (const p of carriageParts) carriageHomes.set(p, p.position.clone());
     scene.add(model);
 
     if (paperMesh) {
@@ -315,8 +320,9 @@ let ejecting = false;
 const typeQueue = [];   // input buffered during the eject animation
 
 // --- carriage motion state ---
-let guideX = COL0_PX;    // the type guide glides toward the next strike cell
-let guideV = 0;          // spring velocity, for a slight mechanical overshoot
+let carCol = 0;          // eased column: drives the real 3D carriage position
+let carV = 0;            // spring velocity, for a slight mechanical overshoot
+let guideX = COL0_PX + CHAR_PX / 2;  // painted guide, derived from carCol
 let riseFrac = 0;        // -1..0 during the line-feed sweep (page eases up)
 let stampT = 1;          // 0..1 ink-press animation of the newest strike
 let paperDirty = true;
@@ -371,7 +377,7 @@ function paintPaper() {
   // machine feel mechanical.
   const li = lineIndex + riseFrac;
   const pageTop = EDGE0 + li * LINE_PX;
-  const jolt = riseFrac < 0 ? Math.sin(Math.PI * (1 + riseFrac)) * 5 : 0;
+  const jolt = 0;   // the real 3D carriage supplies the horizontal motion now
   const dip = (1 - stampT) * 2.4;
 
   pctx.clearRect(0, 0, TEXW, TEXH);
@@ -581,16 +587,26 @@ function animate() {
   }
   stepEject(dt);
 
-  // --- carriage motion: springy guide glide, line-feed sweep, ink press ---
+  // --- carriage motion: the real carriage springs left per strike and
+  // sweeps back right on return; the painted guide rides the same spring
+  // so the strike point stays fixed under the type guide, like the machine ---
   let moving = false;
-  const guideTarget = COL0_PX + col * CHAR_PX + CHAR_PX / 2;
-  const gd = guideTarget - guideX;
-  if (Math.abs(gd) > 0.1 || Math.abs(guideV) > 0.5) {
-    guideV += gd * 520 * dt;              // stiff spring — quick, slight overshoot
-    guideV *= Math.exp(-15 * dt);         // damping
-    guideX += guideV * dt;
+  const cd = col - carCol;
+  if (Math.abs(cd) > 0.01 || Math.abs(carV) > 0.05) {
+    carV += cd * 520 * dt;                // stiff spring — quick, slight overshoot
+    carV *= Math.exp(-15 * dt);           // damping
+    carCol += carV * dt;
     moving = true;
-  } else { if (guideX !== guideTarget) moving = true; guideX = guideTarget; guideV = 0; }
+  } else { if (carCol !== col) moving = true; carCol = col; carV = 0; }
+  guideX = COL0_PX + (carCol + 0.5) * CHAR_PX;
+  if (!ejecting) {
+    const dx = -carCol * CHAR_WORLD;      // carriage travels left as the line fills
+    for (const part of carriageParts) {
+      const home = carriageHomes.get(part);
+      part.position.set(home.x + dx, home.y, home.z);
+    }
+    if (paperMesh) paperMesh.position.set(paperHome.x + dx, paperHome.y, paperHome.z);
+  }
   if (riseFrac < 0) {
     const k = Math.min(1, (1 + riseFrac) + dt / 0.38);
     riseFrac = -(1 - (k * k * (3 - 2 * k)));   // smoothstep sweep
