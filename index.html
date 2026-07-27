@@ -137,7 +137,7 @@
     <button id="newsheet" type="button">Pull sheet</button>
     <button id="sound" type="button" aria-pressed="true">Sound on</button>
   </div>
-  <span id="orbit-hint">DRAG TO ORBIT · SCROLL TO ZOOM · BUILD 15</span>
+  <span id="orbit-hint">DRAG TO ORBIT · SCROLL TO ZOOM · BUILD 16</span>
 </div>
 
 <div id="note"></div>
@@ -592,7 +592,7 @@ function animate() {
   const cd = col - carCol;
   if (Math.abs(cd) > 0.01 || Math.abs(carV) > 0.05) {
     carV += cd * 480 * dt;                // spring with momentum
-    carV *= Math.exp(-12.5 * dt);         // lighter damping — subtle mechanical overshoot
+    carV *= Math.exp(-18 * dt);           // near-critical damping — just a whisper of overshoot
     carCol += carV * dt;
     moving = true;
   } else { if (carCol !== col) moving = true; carCol = col; carV = 0; }
