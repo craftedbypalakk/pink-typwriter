@@ -199,9 +199,10 @@ scene.add(rim);
    ============================================================ */
 const TEXW = 512, TEXH = 1280;   // canvas covers the extended (taller) sheet
 const LINE_PX = 30.509;          // one carriage-return step
-const STRIKE_ROW = 407.50;       // fixed strike line at the platen
+const STRIKE_ROW = 577.0;        // typing position, high on the sheet where it's
+                                 // clearly visible (the page climbs beneath it)
 const BASE_H = 679.16;           // height of one full page image on the canvas
-const EDGE_MARGIN = 4.5;         // blank lines between the page's top edge and line 1
+const EDGE_MARGIN = 1.2;         // blank lines between the page's top edge and line 1
 const EDGE0 = STRIKE_ROW + EDGE_MARGIN * LINE_PX;  // fresh page stands clear of the platen
 const PAGE_LINES = 18;           // the page feeds nearly its full height before
                                  // ejecting, so all three punch holes rise into view
