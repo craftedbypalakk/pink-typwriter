@@ -316,6 +316,7 @@ const typeQueue = [];   // input buffered during the eject animation
 
 // --- carriage motion state ---
 let guideX = COL0_PX;    // the type guide glides toward the next strike cell
+let guideV = 0;          // spring velocity, for a slight mechanical overshoot
 let riseFrac = 0;        // -1..0 during the line-feed sweep (page eases up)
 let stampT = 1;          // 0..1 ink-press animation of the newest strike
 let paperDirty = true;
@@ -365,11 +366,17 @@ function paintPaper() {
   if (!pctx) return;
   // The page's visible top edge is painted: everything above it is
   // transparent, so as the edge row climbs, the sheet truly rises out
-  // of the platen — edge, holes and text all together. riseFrac eases
-  // -1 → 0 during a carriage return so the feed is a sweep, not a jump.
+  // of the platen. riseFrac eases -1 → 0 during a carriage return so
+  // the feed is a sweep; a small sideways jolt and strike dip make the
+  // machine feel mechanical.
   const li = lineIndex + riseFrac;
   const pageTop = EDGE0 + li * LINE_PX;
+  const jolt = riseFrac < 0 ? Math.sin(Math.PI * (1 + riseFrac)) * 5 : 0;
+  const dip = (1 - stampT) * 2.4;
+
   pctx.clearRect(0, 0, TEXW, TEXH);
+  pctx.save();
+  pctx.translate(jolt, dip);
   pctx.drawImage(paperBase, 0, pageTop - BASE_H, TEXW, BASE_H);
 
   for (let i = 0; i < lines.length; i++) {
@@ -379,11 +386,15 @@ function paintPaper() {
     drawLineFlipped(lines[i], row, i === lineIndex ? stampT : 1);
   }
 
-  // The type guide: a soft caret gliding along the strike line.
+  // The type guide: a ribbon-red marker riding the strike line —
+  // an underline at the next cell plus a slim hairline.
   if (!ejecting) {
-    pctx.fillStyle = 'rgba(28, 26, 33, 0.32)';
-    pctx.fillRect(guideX - 1, STRIKE_ROW - 8, 2.5, 16);
+    pctx.fillStyle = 'rgba(140, 47, 47, 0.85)';
+    pctx.fillRect(guideX - CHAR_PX / 2, STRIKE_ROW - 12.5, CHAR_PX, 2.6);
+    pctx.fillStyle = 'rgba(140, 47, 47, 0.5)';
+    pctx.fillRect(guideX - 0.9, STRIKE_ROW - 10, 1.8, 17);
   }
+  pctx.restore();
   paperTexture.needsUpdate = true;
 }
 
@@ -570,14 +581,22 @@ function animate() {
   }
   stepEject(dt);
 
-  // --- carriage motion: guide glide, line-feed sweep, ink press ---
+  // --- carriage motion: springy guide glide, line-feed sweep, ink press ---
   let moving = false;
-  const guideTarget = COL0_PX + col * CHAR_PX;
-  if (Math.abs(guideX - guideTarget) > 0.15) {
-    guideX += (guideTarget - guideX) * Math.min(1, dt * 16);
+  const guideTarget = COL0_PX + col * CHAR_PX + CHAR_PX / 2;
+  const gd = guideTarget - guideX;
+  if (Math.abs(gd) > 0.1 || Math.abs(guideV) > 0.5) {
+    guideV += gd * 520 * dt;              // stiff spring — quick, slight overshoot
+    guideV *= Math.exp(-15 * dt);         // damping
+    guideX += guideV * dt;
     moving = true;
-  } else if (guideX !== guideTarget) { guideX = guideTarget; moving = true; }
-  if (riseFrac < 0) { riseFrac = Math.min(0, riseFrac + dt / 0.26); moving = true; }
+  } else { if (guideX !== guideTarget) moving = true; guideX = guideTarget; guideV = 0; }
+  if (riseFrac < 0) {
+    const k = Math.min(1, (1 + riseFrac) + dt / 0.38);
+    riseFrac = -(1 - (k * k * (3 - 2 * k)));   // smoothstep sweep
+    if (riseFrac > -0.001) riseFrac = 0;
+    moving = true;
+  }
   if (stampT < 1) { stampT = Math.min(1, stampT + dt / 0.09); moving = true; }
   if (moving || paperDirty) { paintPaper(); paperDirty = false; }
 
