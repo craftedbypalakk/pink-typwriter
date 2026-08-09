@@ -133,10 +133,9 @@
 </head>
 <body>
 
-<div id="loader" role="status" aria-live="polite">
+<div id="loader" role="status" aria-live="polite" aria-label="Loading">
   <canvas id="pixel-royal" class="loading" width="29" height="22" aria-hidden="true"></canvas>
-  <div class="word">ROYAL<span class="caret"></span></div>
-  <div class="pct" id="loader-pct">LOADING 0%</div>
+  <div class="pct" id="loader-pct" hidden>LOADING 0%</div>
 </div>
 
 <header>
@@ -155,7 +154,7 @@
     <button id="newsheet" type="button">Pull sheet</button>
     <button id="sound" type="button" aria-pressed="true">Sound on</button>
   </div>
-  <span id="orbit-hint">DRAG TO ORBIT · SCROLL TO ZOOM · BUILD 22</span>
+  <span id="orbit-hint">DRAG TO ORBIT · SCROLL TO ZOOM · BUILD 24</span>
 </div>
 
 <div id="note"></div>
@@ -230,7 +229,7 @@ const MAX_COL = 38;
 const BELL_COL = 33;
 const FEED_VEC = new THREE.Vector3(0.0033, 1.0157, 0.4244); // world per line step (used by eject)
 const CHAR_WORLD = 0.41078;      // world distance the carriage travels per character
-const START_COL = 4;             // carriage rest offset: slightly right of home at line
+const START_COL = 2;             // carriage rest offset: slightly right of home at line
                                  // start (more and the return lever clips the body shell),
                                  // sweeping well left of home by the end of the line
 const EJECT_STEPS = 9;           // how far the sheet flies when ejected
@@ -356,7 +355,7 @@ const PixelRoyal = (() => {
 })();
 
 new GLTFLoader().load(
-  'typewriter_rigged_clean.glb?v=16',
+  'typewriter_rigged_clean.glb?v=17',
   (gltf) => {
     const model = gltf.scene;
     model.traverse((obj) => {
