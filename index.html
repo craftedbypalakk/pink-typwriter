@@ -40,6 +40,23 @@
   @keyframes blink { 50% { opacity: 0; } }
   #loader .pct { font-size: 12px; letter-spacing: .3em; color: var(--brass); }
 
+  /* ---------- pixel typewriter mascot ---------- */
+  #pixel-royal {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+  #pixel-royal.loading {
+    width: 232px; height: 176px;   /* 8x scale */
+  }
+  #pixel-royal.corner {
+    position: fixed; right: 22px; bottom: 18px; z-index: 10;
+    width: 87px; height: 66px;     /* 3x scale */
+    opacity: .9;
+    pointer-events: none;
+    transition: opacity .4s ease;
+  }
+  @media (max-width: 720px) { #pixel-royal.corner { display: none; } }
+
   /* ---------- Chrome ---------- */
   header {
     position: fixed; top: 0; left: 0; right: 0; z-index: 10;
@@ -117,6 +134,7 @@
 <body>
 
 <div id="loader" role="status" aria-live="polite">
+  <canvas id="pixel-royal" class="loading" width="29" height="22" aria-hidden="true"></canvas>
   <div class="word">ROYAL<span class="caret"></span></div>
   <div class="pct" id="loader-pct">LOADING 0%</div>
 </div>
@@ -137,7 +155,7 @@
     <button id="newsheet" type="button">Pull sheet</button>
     <button id="sound" type="button" aria-pressed="true">Sound on</button>
   </div>
-  <span id="orbit-hint">DRAG TO ORBIT · SCROLL TO ZOOM · BUILD 19</span>
+  <span id="orbit-hint">DRAG TO ORBIT · SCROLL TO ZOOM · BUILD 22</span>
 </div>
 
 <div id="note"></div>
@@ -235,6 +253,108 @@ let paperTexture = null;
 const loaderEl = document.getElementById('loader');
 const pctEl = document.getElementById('loader-pct');
 
+/* ============================================================
+   Pixel Royal — a tiny pixelated typewriter character.
+   Stars on the loading screen, then sits in the corner and
+   mirrors every real keystroke: keys blink, ink dots land,
+   its carriage steps left and sweeps back on return.
+   ============================================================ */
+const PixelRoyal = (() => {
+  const cv = document.getElementById('pixel-royal');
+  const g = cv.getContext('2d');
+  const W = 29, H = 22;
+  const INK = '#f5f0e4';   // single-color sprite, matches the page palette
+  const st = {
+    carX: 2,          // carriage pixel offset: starts right, steps left
+    carTarget: 2,
+    inkCol: 0, inkRow: 0, ink: [],   // dots on the little page
+    pressed: null, pressT: 0,
+    bob: 0, t: 0, ding: 0,
+    demo: true, demoT: 0,
+  };
+  const KEY_ROWS = [
+    { y: 15, xs: [7,9,11,13,15,17,19,21] },
+    { y: 17, xs: [8,10,12,14,16,18,20] },
+  ];
+  function px(x, y) { g.fillRect(x, y, 1, 1); }
+  function rect(x, y, w, h) { g.fillRect(x, y, w, h); }
+  function outline(x, y, w, h) {
+    rect(x, y, w, 1); rect(x, y + h - 1, w, 1);
+    rect(x, y, 1, h); rect(x + w - 1, y, 1, h);
+  }
+
+  function draw() {
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = INK;              // one color; form comes from the gaps
+    const b = st.bob;               // 0 or 1 px breathing
+    const cx = Math.round(st.carX); // carriage offset
+
+    // --- carriage group: paper + platen + knobs (shifts with cx) ---
+    rect(9 + cx, 0 + b, 11, 7);                    // solid plain page
+    for (const d of st.ink)                        // letters = punched square dots
+      g.clearRect(10 + cx + d[0], 1 + b + d[1], 1, 1);
+    rect(6 + cx, 7 + b, 17, 2);                    // platen bar
+    rect(4 + cx, 7 + b, 1, 2);                     // knobs
+    rect(24 + cx, 7 + b, 1, 2);
+    if (st.ding > 0) px(25 + cx, 5 + b);           // bell blink
+
+    // --- fixed body: hollow shell so the keys read inside it ---
+    rect(4, 10 + b, 21, 1);                        // top deck
+    outline(3, 11 + b, 23, 9);
+    rect(2, 20 + b, 25, 1);                        // base
+    for (let i = 0; i < 5; i++) px(12 + i, 12 + b);  // ROYAL dash
+
+    // --- keys: dots that dip when struck ---
+    for (let r = 0; r < KEY_ROWS.length; r++) {
+      const row = KEY_ROWS[r];
+      for (let k = 0; k < row.xs.length; k++) {
+        const down = st.pressed && st.pressed[0] === r && st.pressed[1] === k;
+        px(row.xs[k], row.y + b + (down ? 1 : 0));
+      }
+    }
+  }
+
+  function type() {
+    // random key press
+    const r = Math.floor(Math.random() * KEY_ROWS.length);
+    const k = Math.floor(Math.random() * KEY_ROWS[r].xs.length);
+    st.pressed = [r, k]; st.pressT = 0.1;
+    // a letter-dot lands, carriage steps left; auto-return at the margin
+    if (st.inkCol >= 9) ret();
+    st.ink.push([st.inkCol, st.inkRow]);
+    st.inkCol++;
+    st.carTarget = 2 - (st.inkCol / 9) * 4;   // 2 .. -2 px across the line
+  }
+  function ret() {
+    st.carTarget = 2; st.ding = 0.5;
+    st.inkCol = 0;
+    st.inkRow++;
+    if (st.inkRow > 4) {           // dots reached the end of the page: loop
+      st.ink = [];
+      st.inkRow = 0;
+    }
+  }
+  function tick(dt) {
+    st.t += dt;
+    st.bob = (Math.sin(st.t * 2.4) > 0.93) ? 1 : 0;
+    st.carX += (st.carTarget - st.carX) * Math.min(1, dt * 14);
+    if (st.pressT > 0) { st.pressT -= dt; if (st.pressT <= 0) st.pressed = null; }
+    if (st.ding > 0) st.ding -= dt;
+    if (st.demo) {                 // self-typing while the big machine loads
+      st.demoT -= dt;
+      if (st.demoT <= 0) { type(); st.demoT = 0.12 + Math.random() * 0.22; }
+    }
+    draw();
+  }
+  function toCorner() {
+    st.demo = false;
+    cv.classList.remove('loading');
+    cv.classList.add('corner');
+    document.body.appendChild(cv);
+  }
+  return { tick, type, ret, toCorner };
+})();
+
 new GLTFLoader().load(
   'typewriter_rigged_clean.glb?v=16',
   (gltf) => {
@@ -304,6 +424,7 @@ new GLTFLoader().load(
     }
 
     loaderEl.classList.add('hidden');
+    PixelRoyal.toCorner();
   },
   (xhr) => {
     if (xhr.total) pctEl.textContent = `LOADING ${Math.round((xhr.loaded / xhr.total) * 100)}%`;
@@ -416,6 +537,7 @@ function typeChar(ch) {
   });
   col++;
   stampT = 0;   // ink-press animation of the fresh strike
+  PixelRoyal.type();
   if (col === BELL_COL) { ding(); flashNote('ding — near the margin'); }
   updateCounter();
   redrawPaper();
@@ -427,6 +549,7 @@ function carriageReturnAction() {
   lineIndex++;
   col = 0;
   riseFrac = -1;   // the page sweeps up into place instead of jumping
+  PixelRoyal.ret();
   carriageReturn();
   updateCounter();
   redrawPaper();
@@ -618,6 +741,7 @@ function animate() {
   }
   if (stampT < 1) { stampT = Math.min(1, stampT + dt / 0.09); moving = true; }
   if (moving || paperDirty) { paintPaper(); paperDirty = false; }
+  PixelRoyal.tick(dt);
 
   controls.update();
   renderer.render(scene, camera);
