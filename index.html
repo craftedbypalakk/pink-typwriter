@@ -154,7 +154,7 @@
     <button id="newsheet" type="button">Pull sheet</button>
     <button id="sound" type="button" aria-pressed="true">Sound on</button>
   </div>
-  <span id="orbit-hint">DRAG TO ORBIT · SCROLL TO ZOOM · BUILD 25</span>
+  <span id="orbit-hint">DRAG TO ORBIT · SCROLL TO ZOOM · BUILD 26</span>
 </div>
 
 <div id="note"></div>
@@ -408,9 +408,10 @@ new GLTFLoader().load(
     controls.maxDistance = radius * 2.4;
     controls.update();
 
-    // The typing view: high and front-on, page filling the frame.
-    typeViewPos = new THREE.Vector3(center.x, center.y + radius * 1.02, center.z + radius * 0.58);
-    typeViewTarget = new THREE.Vector3(center.x, center.y + radius * 0.20, center.z - radius * 0.06);
+    // The typing view: front-on and pulled back, whole machine centered —
+    // page readable up top, keyboard visible below.
+    typeViewPos = new THREE.Vector3(center.x, center.y + radius * 1.0, center.z + radius * 0.95);
+    typeViewTarget = center.clone();
 
     const ground = new THREE.Mesh(
       new THREE.CircleGeometry(radius * 2.2, 48),
