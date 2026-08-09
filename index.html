@@ -137,7 +137,7 @@
     <button id="newsheet" type="button">Pull sheet</button>
     <button id="sound" type="button" aria-pressed="true">Sound on</button>
   </div>
-  <span id="orbit-hint">DRAG TO ORBIT · SCROLL TO ZOOM · BUILD 17</span>
+  <span id="orbit-hint">DRAG TO ORBIT · SCROLL TO ZOOM · BUILD 19</span>
 </div>
 
 <div id="note"></div>
@@ -212,8 +212,9 @@ const MAX_COL = 38;
 const BELL_COL = 33;
 const FEED_VEC = new THREE.Vector3(0.0033, 1.0157, 0.4244); // world per line step (used by eject)
 const CHAR_WORLD = 0.41078;      // world distance the carriage travels per character
-const CENTER_COL = MAX_COL / 2;  // carriage travel is centered: it starts just past the
-                                 // right edge of the typing area and ends past the left
+const START_COL = 4;             // carriage rest offset: slightly right of home at line
+                                 // start (more and the return lever clips the body shell),
+                                 // sweeping well left of home by the end of the line
 const EJECT_STEPS = 9;           // how far the sheet flies when ejected
 
 /* ============================================================
@@ -235,7 +236,7 @@ const loaderEl = document.getElementById('loader');
 const pctEl = document.getElementById('loader-pct');
 
 new GLTFLoader().load(
-  'typewriter_rigged_clean.glb?v=15',
+  'typewriter_rigged_clean.glb?v=16',
   (gltf) => {
     const model = gltf.scene;
     model.traverse((obj) => {
@@ -523,7 +524,7 @@ function stepEject(dt) {
     const k = Math.min(A.t / 0.65, 1);
     const e = 1 - Math.pow(1 - k, 3);
     paperMesh.position.copy(paperHome).addScaledVector(FEED_VEC, e * EJECT_STEPS);
-    paperMesh.position.x += (CENTER_COL - carCol) * CHAR_WORLD;
+    paperMesh.position.x += (START_COL - carCol) * CHAR_WORLD;
     paperMesh.material.opacity = 1 - Math.max(0, (k - 0.7) / 0.3);
     if (k === 1) {
       finishEjectSwap();
@@ -536,7 +537,7 @@ function stepEject(dt) {
     const k = Math.min(A.t / 0.45, 1);
     const e = 1 - Math.pow(1 - k, 2);
     paperMesh.position.copy(paperHome).addScaledVector(FEED_VEC, (1 - e) * 2.2);
-    paperMesh.position.x += (CENTER_COL - carCol) * CHAR_WORLD;
+    paperMesh.position.x += (START_COL - carCol) * CHAR_WORLD;
     paperMesh.material.opacity = Math.min(1, k * 2.5);
     if (k === 1) {
       paperMesh.position.copy(paperHome);
@@ -602,7 +603,7 @@ function animate() {
   if (!ejecting) {
     // Rightmost at the start of a line, sweeping left keystroke by keystroke,
     // then flying back right on the return — like the real machine.
-    const dx = (CENTER_COL - carCol) * CHAR_WORLD;
+    const dx = (START_COL - carCol) * CHAR_WORLD;
     for (const part of carriageParts) {
       const home = carriageHomes.get(part);
       part.position.set(home.x + dx, home.y, home.z);
